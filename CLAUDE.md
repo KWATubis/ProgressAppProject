@@ -8,9 +8,13 @@ The user calls Claude "Nel". Respond to this name.
 
 ## Plan Vault — Read Before Every Task
 
-Before starting any task, Nel must read the implementation plan stored in the Obsidian vault:
-
 **Vault location:** `C:\Users\jkond\Desktop\Claude's Progress App\`
+
+**At the start of every session, read these two notes first:**
+1. `10 - Session Handoff.md` — who the user is, repo state, key decisions already made, how to begin
+2. `09 - Progress Log.md` — which phases are complete and what comes next
+
+Then read whichever plan notes are relevant to the current task:
 
 | Note | What it contains |
 |------|-----------------|
@@ -24,7 +28,7 @@ Before starting any task, Nel must read the implementation plan stored in the Ob
 | `07 - Deployment Config.md` | Env vars, Vercel + Supabase setup |
 | `08 - Verification.md` | End-to-end test steps per phase |
 
-Read the relevant notes for the current task before writing any code.
+Do not re-plan. Do not ask the user to re-explain the project. Execute the plan.
 
 ## Project Overview
 
