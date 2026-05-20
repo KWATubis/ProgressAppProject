@@ -25,9 +25,10 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-60 shrink-0 border-r bg-card md:flex md:flex-col">
-      <div className="flex h-14 items-center border-b px-6">
-        <Link href="/dashboard" className="text-lg font-semibold tracking-tight">
+    <aside className="hidden w-60 shrink-0 border-r border-sidebar-border bg-sidebar md:flex md:flex-col">
+      <div className="flex h-14 items-center border-b border-sidebar-border px-6">
+        <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <span className="h-2 w-2 rounded-full bg-foreground shadow-[0_0_12px_rgba(255,255,255,0.6)]" />
           Portion
         </Link>
       </div>

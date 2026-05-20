@@ -9,7 +9,7 @@ export function TopBar({ email, name }: TopBarProps) {
   const displayName = name || email || "";
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-4 sm:px-6">
+    <header className="flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-sm sm:px-6">
       <div className="text-sm text-muted-foreground md:hidden font-semibold text-foreground">
         Portion
       </div>

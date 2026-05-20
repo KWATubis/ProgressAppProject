@@ -20,10 +20,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full bg-background font-sans">
+    <html lang="en" className={`${inter.variable} dark h-full antialiased`}>
+      <body className="min-h-full bg-background font-sans text-foreground">
         {children}
-        <Toaster richColors position="top-right" />
+        <Toaster richColors position="top-right" theme="dark" />
       </body>
     </html>
   );

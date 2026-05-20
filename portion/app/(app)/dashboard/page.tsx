@@ -59,6 +59,7 @@ export default async function DashboardPage() {
         title: g.title,
         currentValue: g.currentValue,
         targetValue: g.targetValue,
+        startValue: g.startValue,
         unit: g.unit,
         targetDate: g.targetDate ? formatISODate(g.targetDate) : null,
       }));

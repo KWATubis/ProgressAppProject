@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { TopBar } from "@/components/layout/TopBar";
+import { AmbientBackground } from "@/components/layout/AmbientBackground";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -20,7 +21,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   });
 
   return (
-    <div className="flex min-h-screen">
+    <div className="relative flex min-h-screen">
+      <AmbientBackground />
       <Sidebar />
       <div className="flex flex-1 flex-col">
         <TopBar email={profile?.email ?? user.email} name={profile?.name} />

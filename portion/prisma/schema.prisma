@@ -67,6 +67,7 @@ model Goal {
   targetDate   DateTime?
   targetValue  Float?
   currentValue Float?
+  startValue   Float?
   unit         String?
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())

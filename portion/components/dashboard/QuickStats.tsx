@@ -20,9 +20,12 @@ export function QuickStats({ stats }: { stats: Stat[] }) {
       {stats.map((s) => {
         const Icon = ICONS[s.icon];
         return (
-          <Card key={s.label}>
+          <Card
+            key={s.label}
+            className="border-white/10 bg-gradient-to-br from-white/[0.03] to-transparent shadow-[0_4px_20px_-8px_rgba(0,0,0,0.6)]"
+          >
             <CardContent className="flex items-center gap-3 py-4">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+              <div className="flex h-9 w-9 items-center justify-center rounded-md border border-white/10 bg-white/[0.04]">
                 <Icon className="h-4 w-4 text-muted-foreground" />
               </div>
               <div className="min-w-0">
