@@ -40,7 +40,14 @@
       "PowerShell(@\\(Get-ChildItem -Path \"C:\\\\Users\\\\jkond\\\\Desktop\" -ErrorAction SilentlyContinue\\).Count; Get-ChildItem -Path \"C:\\\\Users\\\\jkond\\\\Desktop\" -ErrorAction SilentlyContinue | ForEach-Object { $_.Name })",
       "Bash(git *)",
       "mcp__plugin_context7-plugin_context7__resolve-library-id",
-      "mcp__plugin_context7-plugin_context7__query-docs"
+      "mcp__plugin_context7-plugin_context7__query-docs",
+      "Bash(npx create-next-app@latest portion --typescript --tailwind --app --src-dir=false --import-alias=\"@/*\" --eslint --no-turbopack)",
+      "Bash(npm install *)",
+      "Bash(npx prisma *)",
+      "Bash(node_modules/.bin/prisma init *)",
+      "Bash(npx shadcn@latest init --defaults)",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; npx shadcn@latest init --defaults 2>&1)",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; npx shadcn@latest add button card dialog input label textarea tabs badge progress separator skeleton sonner --overwrite 2>&1)"
     ]
   }
 }

@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Pillar {
+  HEALTH
+  MONEY
+}
+
+enum TaskFrequency {
+  DAILY
+  WEEKLY
+  ONE_TIME
+}
+
+enum TaskStatus {
+  PENDING
+  COMPLETE
+  SKIPPED
+}
+
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+model Profile {
+  id                String             @id
+  email             String             @unique
+  name              String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  goals             Goal[]
+  tasks             Task[]
+  taskLogs          TaskLog[]
+  workoutSessions   WorkoutSession[]
+  dietLogs          DietLog[]
+  bodyMetrics       BodyMetric[]
+  socialMetrics     SocialMetric[]
+  incomeEntries     IncomeEntry[]
+  onboardingSession OnboardingSession?
+}
+
+model OnboardingSession {
+  id         String   @id @default(cuid())
+  profileId  String   @unique
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  messages   Json
+  isComplete Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Goal {
+  id           String    @id @default(cuid())
+  profileId    String
+  profile      Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  pillar       Pillar
+  title        String
+  description  String?
+  targetDate   DateTime?
+  targetValue  Float?
+  currentValue Float?
+  unit         String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  tasks        Task[]
+}
+
+model Task {
+  id            String        @id @default(cuid())
+  profileId     String
+  profile       Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  goalId        String?
+  goal          Goal?         @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  pillar        Pillar
+  title         String
+  description   String?
+  frequency     TaskFrequency
+  scheduledAt   DateTime?
+  dayOfWeek     Int[]
+  isAiGenerated Boolean       @default(false)
+  isActive      Boolean       @default(true)
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  taskLogs      TaskLog[]
+}
+
+model TaskLog {
+  id        String     @id @default(cuid())
+  profileId String
+  profile   Profile    @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  date      DateTime
+  status    TaskStatus @default(PENDING)
+  note      String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([taskId, date])
+}
+
+model WorkoutSession {
+  id          String        @id @default(cuid())
+  profileId   String
+  profile     Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date        DateTime
+  type        String
+  durationMin Int?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  exercises   ExerciseSet[]
+  runs        RunEntry[]
+}
+
+model Exercise {
+  id           String        @id @default(cuid())
+  name         String        @unique
+  category     String
+  exerciseSets ExerciseSet[]
+}
+
+model ExerciseSet {
+  id          String         @id @default(cuid())
+  sessionId   String
+  session     WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId  String
+  exercise    Exercise       @relation(fields: [exerciseId], references: [id])
+  setNumber   Int
+  reps        Int?
+  weightKg    Float?
+  holdSeconds Int?
+  notes       String?
+}
+
+model RunEntry {
+  id              String         @id @default(cuid())
+  sessionId       String
+  session         WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  type            String
+  distanceKm      Float?
+  durationMin     Int?
+  avgPaceSecPerKm Int?
+}
+
+model DietLog {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date      DateTime
+  slot      MealSlot
+  name      String
+  kcal      Int
+  proteinG  Float
+  fatG      Float
+  carbsG    Float
+  notes     String?
+  createdAt DateTime @default(now())
+}
+
+model BodyMetric {
+  id         String   @id @default(cuid())
+  profileId  String
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date       DateTime
+  weightKg   Float?
+  bodyFatPct Float?
+  chestCm    Float?
+  waistCm    Float?
+  hipsCm     Float?
+  armCm      Float?
+  thighCm    Float?
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@unique([profileId, date])
+}
+
+model SocialMetric {
+  id            String   @id @default(cuid())
+  profileId     String
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  platform      String
+  date          DateTime
+  followerCount Int
+  videoCount    Int?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  @@unique([profileId, platform, date])
+}
+
+model IncomeEntry {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date        DateTime
+  source      String
+  amountPln   Float
+  description String?
+  createdAt   DateTime @default(now())
+}
