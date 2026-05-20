@@ -35,7 +35,7 @@ export async function signup(formData: FormData): Promise<AuthResult> {
     create: { id: data.user.id, email, name: name ?? undefined },
   });
 
-  redirect("/dashboard");
+  redirect("/onboarding");
 }
 
 export async function logout() {
