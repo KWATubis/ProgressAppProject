@@ -8,18 +8,26 @@ import {
   useSpring,
   useTransform,
   useScroll,
+  type Variants,
 } from "framer-motion";
 import { ArrowRight, Dumbbell, TrendingUp, Target } from "lucide-react";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const fadeUp = {
+const fadeUp: Variants = {
   hidden: { opacity: 0, y: 24 },
   show: (i: number = 0) => ({
     opacity: 1,
     y: 0,
     transition: { duration: 0.7, ease, delay: i * 0.08 },
   }),
+};
+
+// Replays every time element enters viewport
+const inViewProps = {
+  initial: "hidden" as const,
+  whileInView: "show" as const,
+  viewport: { once: false, amount: 0.3 },
 };
 
 export default function LandingPage() {
@@ -91,8 +99,7 @@ export default function LandingPage() {
       >
         <motion.div
           variants={fadeUp}
-          initial="hidden"
-          animate="show"
+          {...inViewProps}
           custom={0}
           className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-medium text-white/70 backdrop-blur"
         >
@@ -104,10 +111,10 @@ export default function LandingPage() {
         </motion.div>
 
         <h1 className="max-w-4xl text-center text-5xl font-semibold leading-[1.05] tracking-tight sm:text-7xl">
-          <motion.span variants={fadeUp} initial="hidden" animate="show" custom={1} className="block">
+          <motion.span variants={fadeUp} {...inViewProps} custom={1} className="block">
             You&apos;re going all in
           </motion.span>
-          <motion.span variants={fadeUp} initial="hidden" animate="show" custom={2} className="block">
+          <motion.span variants={fadeUp} {...inViewProps} custom={2} className="block">
             on your body{" "}
             <span className="bg-gradient-to-b from-white/70 to-white/30 bg-clip-text text-transparent">
               and your bag.
@@ -115,21 +122,16 @@ export default function LandingPage() {
           </motion.span>
         </h1>
 
-        <motion.p
-          variants={fadeUp}
-          initial="hidden"
-          animate="show"
-          custom={3}
+        <RevealWords
+          text="The only tracker built for both. Train your body, build your income, log the work — one place, nothing slipping through the cracks."
           className="mt-7 max-w-xl text-center text-base text-white/60 sm:text-lg"
-        >
-          The only tracker built for both. Gym sessions, macros, follower count, income —
-          one place, nothing slipping through the cracks.
-        </motion.p>
+          tag="p"
+          stagger={0.025}
+        />
 
         <motion.div
           variants={fadeUp}
-          initial="hidden"
-          animate="show"
+          {...inViewProps}
           custom={4}
           className="mt-10 flex flex-col items-center gap-3 sm:flex-row"
         >
@@ -152,8 +154,7 @@ export default function LandingPage() {
         {/* Dashboard mockup */}
         <motion.div
           variants={fadeUp}
-          initial="hidden"
-          animate="show"
+          {...inViewProps}
           custom={5}
           onMouseMove={onMouseMove}
           onMouseLeave={() => {
@@ -178,21 +179,18 @@ export default function LandingPage() {
 
       {/* Pillars */}
       <section className="relative z-10 mx-auto max-w-6xl px-6 pb-28 sm:px-10">
-        <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-120px" }}
-          transition={{ duration: 0.7, ease }}
-          className="mx-auto max-w-xl text-center text-base text-white/60"
-        >
-          You have the discipline. What you don&apos;t have is one place to see it all working.
-        </motion.p>
+        <RevealWords
+          text="You have the discipline. What you don't have is one place to see it all working."
+          className="mx-auto block max-w-xl text-center text-base text-white/60"
+          tag="p"
+          stagger={0.03}
+        />
 
         <div className="mt-12 grid gap-5 sm:grid-cols-2">
           <Pillar
             icon={<Dumbbell className="h-5 w-5" />}
             title="Train like it counts."
-            body="Log every session. Track sets, reps, weight, calisthenics holds, run splits. Hit your macro targets. Watch your body move toward the goal — with data, not hope."
+            body="Log every session. Sets, reps, weight, calisthenics holds, run splits. Hit your macros. Watch your body move toward the goal — with data, not hope."
             stats={[
               { label: "Sessions logged", value: "184" },
               { label: "Macro accuracy", value: "92%" },
@@ -202,29 +200,34 @@ export default function LandingPage() {
           <Pillar
             icon={<TrendingUp className="h-5 w-5" />}
             title="Build like it compounds."
-            body="Log your TikTok growth, income by source, monthly targets. The brand and the bag — side by side, every single day."
+            body="Whatever you're building — a brand, a business, a sales pipeline, a skill — log it every day. Revenue, reach, deals closed, hours of deep work. Numbers don't lie."
             stats={[
-              { label: "Followers", value: "8.2k" },
-              { label: "Monthly revenue", value: "€2.1k" },
-              { label: "Growth rate", value: "+11%" },
+              { label: "Revenue / mo", value: "€2.1k" },
+              { label: "Goals on track", value: "6/8" },
+              { label: "Streak", value: "47 days" },
             ]}
           />
         </div>
 
         {/* Final CTA */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-100px" }}
-          transition={{ duration: 0.7, ease }}
+          variants={fadeUp}
+          {...inViewProps}
+          custom={0}
           className="mt-24 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-white/[0.06] via-white/[0.03] to-transparent p-12 text-center sm:p-16"
         >
-          <h2 className="mx-auto max-w-2xl text-3xl font-semibold tracking-tight sm:text-5xl">
-            Stop hoping. Start tracking.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-base text-white/60">
-            One year from now you&apos;ll wish you started today. Don&apos;t be that guy.
-          </p>
+          <RevealWords
+            text="Stop hoping. Start tracking."
+            className="mx-auto block max-w-2xl text-3xl font-semibold tracking-tight sm:text-5xl"
+            tag="h2"
+            stagger={0.06}
+          />
+          <RevealWords
+            text="One year from now you'll wish you started today. Don't be that guy."
+            className="mx-auto mt-5 block max-w-md text-base text-white/60"
+            tag="p"
+            stagger={0.025}
+          />
           <Link
             href="/onboarding"
             className="group mt-10 inline-flex items-center gap-2 overflow-hidden rounded-full bg-white px-8 py-4 text-sm font-semibold text-black transition hover:scale-[1.02] active:scale-[0.98]"
@@ -239,6 +242,59 @@ export default function LandingPage() {
         Portion · built for the ones who do both
       </footer>
     </div>
+  );
+}
+
+function RevealWords({
+  text,
+  className = "",
+  tag = "p",
+  stagger = 0.04,
+}: {
+  text: string;
+  className?: string;
+  tag?: "p" | "h2" | "h3" | "span";
+  stagger?: number;
+}) {
+  const words = text.split(" ");
+  const container: Variants = {
+    hidden: {},
+    show: { transition: { staggerChildren: stagger } },
+  };
+  const word: Variants = {
+    hidden: { opacity: 0, y: 10, filter: "blur(4px)" },
+    show: {
+      opacity: 1,
+      y: 0,
+      filter: "blur(0px)",
+      transition: { duration: 0.55, ease },
+    },
+  };
+
+  const MotionTag =
+    tag === "h2"
+      ? motion.h2
+      : tag === "h3"
+      ? motion.h3
+      : tag === "span"
+      ? motion.span
+      : motion.p;
+
+  return (
+    <MotionTag
+      className={className}
+      variants={container}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: false, amount: 0.3 }}
+    >
+      {words.map((w, i) => (
+        <motion.span key={i} variants={word} className="inline-block">
+          {w}
+          {i < words.length - 1 && " "}
+        </motion.span>
+      ))}
+    </MotionTag>
   );
 }
 
@@ -335,28 +391,28 @@ function DashboardMockup() {
               <TrendingUp className="h-3.5 w-3.5" />
               Money
             </div>
-            <div className="text-[10px] text-white/40">This week</div>
+            <div className="text-[10px] text-white/40">This month</div>
           </div>
 
-          {/* TikTok */}
+          {/* Revenue */}
           <div className="mt-5">
             <div className="text-[10px] uppercase tracking-wider text-white/40">
-              TikTok @bubis
+              Revenue
             </div>
             <div className="mt-1 flex items-baseline gap-2">
-              <div className="text-2xl font-semibold">8,247</div>
-              <div className="text-xs text-white/50">/ 10,000</div>
+              <div className="text-2xl font-semibold">€2,140</div>
+              <div className="text-xs text-white/50">/ €3,000</div>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/5">
-              <div className="h-full w-[82%] rounded-full bg-gradient-to-r from-white to-white/40" />
+              <div className="h-full w-[71%] rounded-full bg-gradient-to-r from-white to-white/40" />
             </div>
           </div>
 
           {/* Stats */}
           <div className="mt-5 grid grid-cols-2 gap-3">
-            <Stat label="Posts / wk" value="6" />
-            <Stat label="Avg views" value="14.2k" />
-            <Stat label="Revenue" value="€2.1k" />
+            <Stat label="Deep work" value="18h" />
+            <Stat label="Calls / wk" value="9" />
+            <Stat label="Audience" value="8.2k" />
             <Stat label="Growth" value="+11%" />
           </div>
         </div>
@@ -374,8 +430,8 @@ function DashboardMockup() {
             {[
               { label: "Push session · 60 min", done: true },
               { label: "Hit 180g protein", done: true },
-              { label: "Post 1 TikTok", done: true },
-              { label: "Read 20 min", done: true },
+              { label: "Ship 1 piece of content", done: true },
+              { label: "Deep work · 2h", done: true },
               { label: "Cold shower", done: false },
               { label: "Reply to DMs", done: false },
             ].map((t) => (
@@ -465,7 +521,7 @@ function Pillar({
     <motion.div
       initial={{ opacity: 0, y: 28 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-100px" }}
+      viewport={{ once: false, amount: 0.2 }}
       transition={{ duration: 0.7, ease }}
       whileHover={{ y: -4 }}
       className="group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.04] to-white/[0.01] p-7"
@@ -474,17 +530,22 @@ function Pillar({
       <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04]">
         {icon}
       </div>
-      <h3 className="mt-5 text-2xl font-semibold tracking-tight">{title}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-white/60">{body}</p>
+      <RevealWords text={title} tag="h3" className="mt-5 block text-2xl font-semibold tracking-tight" stagger={0.05} />
+      <RevealWords text={body} tag="p" className="mt-3 block text-sm leading-relaxed text-white/60" stagger={0.02} />
       <div className="mt-6 grid grid-cols-3 gap-3 border-t border-white/5 pt-5">
-        {stats.map((s) => (
-          <div key={s.label}>
+        {stats.map((s, i) => (
+          <motion.div
+            key={s.label}
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false, amount: 0.5 }}
+            transition={{ duration: 0.5, ease, delay: 0.3 + i * 0.08 }}
+          >
             <div className="text-[10px] uppercase tracking-wider text-white/40">{s.label}</div>
             <div className="mt-1 text-lg font-semibold">{s.value}</div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </motion.div>
   );
 }
-
