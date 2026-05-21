@@ -44,6 +44,7 @@ model Profile {
   bodyMetrics       BodyMetric[]
   socialMetrics     SocialMetric[]
   incomeEntries     IncomeEntry[]
+  healthFolders     HealthFolder[]
   onboardingSession OnboardingSession?
 }
 
@@ -210,4 +211,18 @@ model IncomeEntry {
   amountPln   Float
   description String?
   createdAt   DateTime @default(now())
+}
+
+model HealthFolder {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name        String
+  slug        String
+  icon        String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([profileId, slug])
 }
