@@ -1,44 +1,42 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navItems, isNavItemActive } from "./nav-items";
 
-const N = navItems.length;
-const STEP = 360 / N; // seamless cylinder: N items * STEP = 360°
-const RADIUS = 150; // px — how far items sit from the wheel axis
-const SENSITIVITY = 0.55; // degrees of spin per px dragged
+const listVariants = {
+  open: {
+    transition: { staggerChildren: 0.07, delayChildren: 0.12 },
+  },
+  closed: {
+    transition: { staggerChildren: 0.04, staggerDirection: -1 },
+  },
+};
 
-function normalize(angle: number): number {
-  // map any angle to (-180, 180]
-  let a = angle % 360;
-  if (a > 180) a -= 360;
-  if (a <= -180) a += 360;
-  return a;
-}
+const itemVariants = {
+  open: {
+    x: 0,
+    opacity: 1,
+    transition: { type: "spring" as const, stiffness: 380, damping: 32 },
+  },
+  closed: {
+    x: -40,
+    opacity: 0,
+    transition: { duration: 0.15 },
+  },
+};
 
 export function MobileNav() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [rotation, setRotation] = useState(0);
-  const [dragging, setDragging] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const startY = useRef(0);
-  const startRotation = useRef(0);
-  const moved = useRef(false);
-
-  // When opening, center the wheel on the item for the current route.
-  function openMenu() {
-    const activeIndex = Math.max(
-      0,
-      navItems.findIndex((item) => isNavItemActive(pathname, item.href)),
-    );
-    setRotation(-activeIndex * STEP);
-    setOpen(true);
-  }
+  useEffect(() => setMounted(true), []);
 
   // Lock body scroll + close on Escape while open.
   useEffect(() => {
@@ -55,128 +53,83 @@ export function MobileNav() {
     };
   }, [open]);
 
-  function onPointerDown(e: React.PointerEvent) {
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    setDragging(true);
-    moved.current = false;
-    startY.current = e.clientY;
-    startRotation.current = rotation;
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!dragging) return;
-    const dy = e.clientY - startY.current;
-    if (Math.abs(dy) > 6) moved.current = true;
-    // Drag down → wheel spins so lower items rise into view.
-    setRotation(startRotation.current + dy * SENSITIVITY);
-  }
-
-  function onPointerUp() {
-    if (!dragging) return;
-    setDragging(false);
-    // Snap to the nearest item.
-    setRotation((r) => Math.round(r / STEP) * STEP);
-  }
-
   function go(href: string) {
-    if (moved.current) return; // it was a spin, not a tap
     setOpen(false);
     router.push(href);
   }
-
-  const selectedIndex = ((Math.round(-rotation / STEP) % N) + N) % N;
 
   return (
     <>
       <button
         type="button"
-        onClick={openMenu}
+        onClick={() => setOpen(true)}
         aria-label="Open menu"
         className="flex h-9 w-9 items-center justify-center rounded-md text-foreground transition-colors hover:bg-accent md:hidden"
       >
         <Menu className="h-5 w-5" />
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background md:hidden">
-          <div className="flex h-14 shrink-0 items-center justify-between px-5">
-            <span className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-              <span className="h-2 w-2 rounded-full bg-foreground shadow-[0_0_12px_rgba(255,255,255,0.6)]" />
-              Portion
-            </span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close menu"
-              className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div
-            className="relative flex-1 touch-none select-none overflow-hidden"
-            style={{ perspective: "700px" }}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {open && (
+            <motion.div
+            initial={{ y: "-100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "-100%" }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            style={{ backgroundColor: "#000" }}
+            className="fixed inset-0 z-50 flex flex-col md:hidden"
           >
-            {/* center selection guides */}
-            <div className="pointer-events-none absolute inset-x-6 top-1/2 -translate-y-7 border-t border-border/60" />
-            <div className="pointer-events-none absolute inset-x-6 top-1/2 translate-y-7 border-t border-border/60" />
+            <div className="flex h-14 shrink-0 items-center justify-between px-5">
+              <span className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                <span className="h-2 w-2 rounded-full bg-foreground shadow-[0_0_12px_rgba(255,255,255,0.6)]" />
+                Portion
+              </span>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close menu"
+                className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-            <div
-              className="absolute inset-x-0 top-1/2 h-0"
-              style={{
-                transformStyle: "preserve-3d",
-                transform: `rotateX(${rotation}deg)`,
-                transition: dragging ? "none" : "transform 0.35s cubic-bezier(0.22,1,0.36,1)",
-              }}
+            <motion.nav
+              variants={listVariants}
+              initial="closed"
+              animate="open"
+              exit="closed"
+              className="relative flex flex-1 flex-col justify-center gap-2 px-6"
             >
-              {navItems.map((item, i) => {
+              {navItems.map((item) => {
                 const Icon = item.icon;
-                const angle = normalize(rotation + i * STEP);
-                const facing = Math.cos((angle * Math.PI) / 180); // 1 at front, <0 on back
-                const isCenter = i === selectedIndex;
+                const active = isNavItemActive(pathname, item.href);
                 return (
-                  <button
+                  <motion.button
                     key={item.href}
+                    variants={itemVariants}
                     type="button"
                     onClick={() => go(item.href)}
-                    className="absolute inset-x-0 top-1/2 -mt-7 flex h-14 items-center justify-center gap-3"
-                    style={{
-                      transformOrigin: "center center",
-                      transform: `rotateX(${i * STEP}deg) translateZ(${RADIUS}px)`,
-                      backfaceVisibility: "hidden",
-                      opacity: facing > 0.05 ? facing : 0,
-                      pointerEvents: facing > 0.6 ? "auto" : "none",
-                    }}
+                    className={cn(
+                      "flex items-center gap-4 rounded-xl px-4 py-4 text-left transition-colors",
+                      active
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                    )}
                   >
-                    <Icon
-                      className={cn(
-                        "h-5 w-5 transition-colors",
-                        isCenter ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    />
-                    <span
-                      className={cn(
-                        "text-2xl font-semibold tracking-tight transition-colors",
-                        isCenter ? "text-foreground" : "text-muted-foreground",
-                      )}
-                    >
+                    <Icon className="h-6 w-6 shrink-0" />
+                    <span className="text-2xl font-semibold tracking-tight">
                       {item.label}
                     </span>
-                  </button>
+                  </motion.button>
                 );
               })}
-            </div>
-          </div>
-
-          <p className="shrink-0 pb-8 text-center text-xs text-muted-foreground">
-            Swipe to spin · tap to open
-          </p>
-        </div>
+            </motion.nav>
+          </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
     </>
   );
