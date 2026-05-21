@@ -127,7 +127,7 @@ export function MobileNav() {
             <div className="pointer-events-none absolute inset-x-6 top-1/2 translate-y-7 border-t border-border/60" />
 
             <div
-              className="absolute left-1/2 top-1/2 h-0 w-full -translate-x-1/2"
+              className="absolute inset-x-0 top-1/2 h-0"
               style={{
                 transformStyle: "preserve-3d",
                 transform: `rotateX(${rotation}deg)`,
@@ -144,8 +144,9 @@ export function MobileNav() {
                     key={item.href}
                     type="button"
                     onClick={() => go(item.href)}
-                    className="absolute left-1/2 top-0 flex h-14 w-full -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-3"
+                    className="absolute inset-x-0 top-1/2 -mt-7 flex h-14 items-center justify-center gap-3"
                     style={{
+                      transformOrigin: "center center",
                       transform: `rotateX(${i * STEP}deg) translateZ(${RADIUS}px)`,
                       backfaceVisibility: "hidden",
                       opacity: facing > 0.05 ? facing : 0,
