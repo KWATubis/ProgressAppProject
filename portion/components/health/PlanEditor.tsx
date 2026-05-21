@@ -6,10 +6,11 @@ import { Plus, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MuscleGroupPicker } from "./MuscleGroupPicker";
 
 type ExerciseRow = {
   name: string;
-  muscleGroup: string;
+  muscles: string[];
   metric: "REPS" | "TIME";
   targetSets: string;
   repRange: string;
@@ -19,7 +20,7 @@ type ExerciseRow = {
 type DayRow = { label: string; exercises: ExerciseRow[] };
 
 function blankExercise(): ExerciseRow {
-  return { name: "", muscleGroup: "", metric: "REPS", targetSets: "3", repRange: "", rir: "" };
+  return { name: "", muscles: [], metric: "REPS", targetSets: "3", repRange: "", rir: "" };
 }
 
 function blankDay(label: string): DayRow {
@@ -53,7 +54,7 @@ export function PlanEditor({
           label: d.label,
           exercises: d.exercises.map((ex) => ({
             name: ex.name,
-            muscleGroup: ex.muscleGroup,
+            muscles: ex.muscleGroup ? ex.muscleGroup.split(",").map((s) => s.trim()).filter(Boolean) : [],
             metric: ex.metric,
             targetSets: String(ex.targetSets),
             repRange: ex.repRange ?? "",
@@ -73,11 +74,20 @@ export function PlanEditor({
   function removeDay(di: number) {
     setDays((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== di) : prev));
   }
-  function updateExercise(di: number, ei: number, field: keyof ExerciseRow, value: string) {
+  function updateExercise(di: number, ei: number, field: "name" | "metric" | "targetSets" | "repRange" | "rir", value: string) {
     setDays((prev) =>
       prev.map((d, i) =>
         i === di
           ? { ...d, exercises: d.exercises.map((ex, j) => (j === ei ? { ...ex, [field]: value } : ex)) }
+          : d,
+      ),
+    );
+  }
+  function setMuscles(di: number, ei: number, muscles: string[]) {
+    setDays((prev) =>
+      prev.map((d, i) =>
+        i === di
+          ? { ...d, exercises: d.exercises.map((ex, j) => (j === ei ? { ...ex, muscles } : ex)) }
           : d,
       ),
     );
@@ -102,10 +112,10 @@ export function PlanEditor({
       .map((d) => ({
         label: d.label.trim(),
         exercises: d.exercises
-          .filter((ex) => ex.name.trim() && ex.muscleGroup.trim())
+          .filter((ex) => ex.name.trim() && ex.muscles.length > 0)
           .map((ex) => ({
             name: ex.name.trim(),
-            muscleGroup: ex.muscleGroup.trim(),
+            muscleGroup: ex.muscles.join(", "),
             metric: ex.metric,
             targetSets: Number(ex.targetSets) || 3,
             repRange: ex.repRange.trim() || null,
@@ -193,12 +203,7 @@ export function PlanEditor({
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    className={`${input} min-w-0 flex-1`}
-                    placeholder="Muscle group"
-                    value={ex.muscleGroup}
-                    onChange={(e) => updateExercise(di, ei, "muscleGroup", e.target.value)}
-                  />
+                  <MuscleGroupPicker value={ex.muscles} onChange={(v) => setMuscles(di, ei, v)} />
                   <div className="flex shrink-0 overflow-hidden rounded-md border">
                     {(["REPS", "TIME"] as const).map((mode) => (
                       <button
@@ -215,22 +220,22 @@ export function PlanEditor({
                     ))}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-1.5 text-sm">
                   <input
-                    className={`${input} w-14 tabular-nums`}
+                    className={`${input} w-10 px-1 text-center tabular-nums`}
                     type="number"
                     min="1"
                     value={ex.targetSets}
                     onChange={(e) => updateExercise(di, ei, "targetSets", e.target.value)}
                   />
-                  <span className="text-muted-foreground">sets ×</span>
+                  <span className="text-xs text-muted-foreground">sets ×</span>
                   <input
-                    className={`${input} w-24 tabular-nums`}
+                    className={`${input} w-16 px-1.5 text-center tabular-nums`}
                     placeholder={ex.metric === "TIME" ? "20–30s" : "8–12"}
                     value={ex.repRange}
                     onChange={(e) => updateExercise(di, ei, "repRange", e.target.value)}
                   />
-                  <span className="text-muted-foreground">{ex.metric === "TIME" ? "hold" : "reps"}</span>
+                  <span className="text-xs text-muted-foreground">{ex.metric === "TIME" ? "hold" : "reps"}</span>
                 </div>
               </div>
             ))}

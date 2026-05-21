@@ -26,13 +26,21 @@ const TRAINING_TYPES: { value: TrainingType; label: string }[] = [
 
 type SegMode = "DIST" | "TIME";
 type Seg = { mode: SegMode; dist: string; min: string; sec: string };
-type Rep = { work: Seg; rest: Seg };
+// Work always has both distance and time; only rest chooses dist or time.
+type Rep = { workDist: string; workMin: string; workSec: string; rest: Seg };
 
 function blankSeg(mode: SegMode): Seg {
   return { mode, dist: "", min: "", sec: "" };
 }
 function blankRep(): Rep {
-  return { work: blankSeg("DIST"), rest: blankSeg("TIME") };
+  return { workDist: "", workMin: "", workSec: "", rest: blankSeg("TIME") };
+}
+function workLapOf(r: Rep): { distanceM: number | null; durationSec: number | null; isWork: boolean } | null {
+  const dist = r.workDist !== "" ? Number(r.workDist) : null;
+  const secs = (Number(r.workMin) || 0) * 60 + (Number(r.workSec) || 0);
+  const dur = secs > 0 ? secs : null;
+  if (dist == null && dur == null) return null;
+  return { distanceM: dist, durationSec: dur, isWork: true };
 }
 
 function segSeconds(s: Seg): number {
@@ -83,15 +91,10 @@ function SegEditor({
         ))}
       </div>
       {seg.mode === "DIST" ? (
-        <>
+        <div className="flex items-center gap-1">
           <input className={`${small} w-16`} type="number" min="0" placeholder="m" value={seg.dist} onChange={(e) => onChange({ ...seg, dist: e.target.value })} />
-          <span className="text-xs text-muted-foreground">in</span>
-          <div className="flex items-center gap-1">
-            <input className={`${small} w-12`} type="number" min="0" placeholder="m" value={seg.min} onChange={(e) => onChange({ ...seg, min: e.target.value })} />
-            <span className="text-muted-foreground">:</span>
-            <input className={`${small} w-12`} type="number" min="0" max="59" placeholder="s" value={seg.sec} onChange={(e) => onChange({ ...seg, sec: e.target.value })} />
-          </div>
-        </>
+          <span className="text-xs text-muted-foreground">m</span>
+        </div>
       ) : (
         <div className="flex items-center gap-1">
           <input className={`${small} w-14`} type="number" min="0" placeholder="min" value={seg.min} onChange={(e) => onChange({ ...seg, min: e.target.value })} />
@@ -130,19 +133,22 @@ export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) 
   const finalPaceSecPerKm = manualPaceSec ?? autoPaceSecPerKm;
 
   // Interval totals (work segments only)
-  const workLaps = reps.map((r) => segToLap(r.work, true)).filter((l): l is NonNullable<typeof l> => l != null);
+  const workLaps = reps.map((r) => workLapOf(r)).filter((l): l is NonNullable<typeof l> => l != null);
   const totalWorkM = workLaps.reduce((s, l) => s + (l.distanceM ?? 0), 0);
   const totalWorkSec = workLaps.reduce((s, l) => s + (l.durationSec ?? 0), 0);
   const intervalAvgPace = totalWorkM > 0 && totalWorkSec > 0 ? Math.round(totalWorkSec / (totalWorkM / 1000)) : null;
 
-  function updateRep(i: number, part: "work" | "rest", seg: Seg) {
-    setReps((prev) => prev.map((r, j) => (j === i ? { ...r, [part]: seg } : r)));
+  function updateWork(i: number, field: "workDist" | "workMin" | "workSec", value: string) {
+    setReps((prev) => prev.map((r, j) => (j === i ? { ...r, [field]: value } : r)));
+  }
+  function updateRest(i: number, seg: Seg) {
+    setReps((prev) => prev.map((r, j) => (j === i ? { ...r, rest: seg } : r)));
   }
   function addRep() {
     setReps((prev) => {
       const last = prev[prev.length - 1];
-      // Carry the shape (modes + rest value) of the previous rep to speed repeated sets.
-      return [...prev, last ? { work: { ...last.work, dist: last.work.dist, min: "", sec: "" }, rest: { ...last.rest } } : blankRep()];
+      // Carry distance + rest from the previous rep to speed repeated sets.
+      return [...prev, last ? { workDist: last.workDist, workMin: "", workSec: "", rest: { ...last.rest } } : blankRep()];
     });
   }
   function removeRep(i: number) {
@@ -153,7 +159,7 @@ export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) 
     if (isStructured) {
       const laps: { distanceM: number | null; durationSec: number | null; isWork: boolean }[] = [];
       for (const r of reps) {
-        const w = segToLap(r.work, true);
+        const w = workLapOf(r);
         if (w) laps.push(w);
         const rest = segToLap(r.rest, false);
         if (rest) laps.push(rest);
@@ -250,8 +256,17 @@ export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) 
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <SegEditor label="Work" seg={r.work} onChange={(s) => updateRep(i, "work", s)} />
-              <SegEditor label="Rest" seg={r.rest} onChange={(s) => updateRep(i, "rest", s)} />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">Work</span>
+                <input className={`${small} w-16`} type="number" min="0" placeholder="m" value={r.workDist} onChange={(e) => updateWork(i, "workDist", e.target.value)} />
+                <span className="text-xs text-muted-foreground">in</span>
+                <div className="flex items-center gap-1">
+                  <input className={`${small} w-12`} type="number" min="0" placeholder="m" value={r.workMin} onChange={(e) => updateWork(i, "workMin", e.target.value)} />
+                  <span className="text-muted-foreground">:</span>
+                  <input className={`${small} w-12`} type="number" min="0" max="59" placeholder="s" value={r.workSec} onChange={(e) => updateWork(i, "workSec", e.target.value)} />
+                </div>
+              </div>
+              <SegEditor label="Rest" seg={r.rest} onChange={(s) => updateRest(i, s)} />
             </div>
           ))}
           <button
