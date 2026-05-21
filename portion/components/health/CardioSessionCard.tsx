@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DeleteSessionButton } from "./DeleteSessionButton";
 
 export type LapView = {
   lapIndex: number;
@@ -88,11 +89,14 @@ export function CardioSessionCard({ session: s }: { session: CardioSessionView }
             </span>
           )}
         </div>
-        {s.source === "garmin" && (
-          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-            Garmin
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {s.source === "garmin" && (
+            <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Garmin
+            </span>
+          )}
+          <DeleteSessionButton sessionId={s.id} />
+        </div>
       </div>
 
       {metrics.length > 0 && (

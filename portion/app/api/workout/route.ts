@@ -8,6 +8,7 @@ const setSchema = z.object({
   setNumber: z.number().int().min(1),
   reps: z.number().int().min(0).max(1000).optional().nullable(),
   weightKg: z.number().min(0).max(1000).optional().nullable(),
+  holdSeconds: z.number().int().min(0).max(86400).optional().nullable(),
 });
 
 const exerciseSchema = z.object({
@@ -19,8 +20,8 @@ const exerciseSchema = z.object({
 const lapSchema = z.object({
   distanceM: z.number().min(0).max(100000).optional().nullable(),
   durationSec: z.number().min(0).max(86400).optional().nullable(),
-  recoverySec: z.number().int().min(0).max(86400).optional().nullable(),
   avgHRBpm: z.number().int().min(0).max(250).optional().nullable(),
+  isWork: z.boolean().optional().default(true),
 });
 
 const runSchema = z.object({
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
   const exercises = body.exercises
     .map((ex) => ({
       ...ex,
-      sets: ex.sets.filter((s) => s.reps != null || s.weightKg != null),
+      sets: ex.sets.filter((s) => s.reps != null || s.weightKg != null || s.holdSeconds != null),
     }))
     .filter((ex) => ex.sets.length > 0);
 
@@ -90,6 +91,7 @@ export async function POST(req: Request) {
                 setNumber: s.setNumber,
                 reps: s.reps ?? null,
                 weightKg: s.weightKg ?? null,
+                holdSeconds: s.holdSeconds ?? null,
                 exercise: {
                   connectOrCreate: {
                     where: { name: ex.name },
@@ -120,8 +122,7 @@ export async function POST(req: Request) {
                           ? Math.round((l.durationSec * 1000) / l.distanceM)
                           : null,
                       avgHRBpm: l.avgHRBpm ?? null,
-                      recoverySec: l.recoverySec ?? null,
-                      isWork: true,
+                      isWork: l.isWork,
                     })),
                   }
                 : undefined,

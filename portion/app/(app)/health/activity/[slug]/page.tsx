@@ -7,6 +7,7 @@ import { CardioProgressChart, type CardioDataPoint } from "@/components/charts/C
 import { PlanSection } from "@/components/health/PlanSection";
 import { GarminUploadButton } from "@/components/health/GarminUploadButton";
 import { CardioSessionCard, type CardioSessionView } from "@/components/health/CardioSessionCard";
+import { DeleteActivityButton } from "@/components/health/DeleteActivityButton";
 
 function paceStr(secPerKm: number) {
   return `${Math.floor(secPerKm / 60)}:${String(secPerKm % 60).padStart(2, "0")}`;
@@ -58,6 +59,7 @@ export default async function ActivityPage({
         <Link href="/check-in">
           <Button size="sm">Log session</Button>
         </Link>
+        <DeleteActivityButton slug={activity.slug} activityName={activity.name} />
       </div>
     </div>
   );
@@ -72,6 +74,7 @@ export default async function ActivityPage({
             exercises: d.exercises.map((ex) => ({
               name: ex.name,
               muscleGroup: ex.muscleGroup,
+              metric: ex.metric,
               targetSets: ex.targetSets,
               repRange: ex.repRange,
               rir: ex.rir,

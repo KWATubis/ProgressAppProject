@@ -22,6 +22,7 @@ type PlanExercise = {
   id: string;
   name: string;
   muscleGroup: string;
+  metric: "REPS" | "TIME";
   targetSets: number;
   repRange: string | null;
   rir: number | null;
@@ -31,11 +32,11 @@ type PlanExercise = {
 type PlanDay = { id: string; label: string; sortOrder: number; exercises: PlanExercise[] };
 type Plan = { id: string; name: string; days: PlanDay[] };
 
-type SetEntry = { weightKg: string; reps: string };
+type SetEntry = { weightKg: string; reps: string; seconds: string };
 type ExerciseState = Record<string, SetEntry[]>;
 
 function blankSets(n: number): SetEntry[] {
-  return Array.from({ length: n }, () => ({ weightKg: "", reps: "" }));
+  return Array.from({ length: n }, () => ({ weightKg: "", reps: "", seconds: "" }));
 }
 
 function initState(day: PlanDay): ExerciseState {
@@ -100,7 +101,7 @@ export function WorkoutLogForm({
   }
 
   function addSet(exName: string) {
-    setEntries((prev) => ({ ...prev, [exName]: [...prev[exName], { weightKg: "", reps: "" }] }));
+    setEntries((prev) => ({ ...prev, [exName]: [...prev[exName], { weightKg: "", reps: "", seconds: "" }] }));
   }
 
   function removeSet(exName: string, idx: number) {
@@ -117,13 +118,14 @@ export function WorkoutLogForm({
       muscleGroup: ex.muscleGroup,
       sets: (entries[ex.name] ?? []).map((s, i) => ({
         setNumber: i + 1,
-        reps: s.reps === "" ? null : Number(s.reps),
+        reps: ex.metric === "TIME" || s.reps === "" ? null : Number(s.reps),
         weightKg: s.weightKg === "" ? null : Number(s.weightKg),
+        holdSeconds: ex.metric === "TIME" && s.seconds !== "" ? Number(s.seconds) : null,
       })),
     }));
 
     const hasData = exercises.some((ex) =>
-      ex.sets.some((s) => s.reps != null || s.weightKg != null),
+      ex.sets.some((s) => s.reps != null || s.weightKg != null || s.holdSeconds != null),
     );
     if (!hasData) {
       toast.error("Enter at least one set before saving.");
@@ -247,7 +249,7 @@ export function WorkoutLogForm({
                         <div className="grid grid-cols-[2rem_1fr_1fr_2rem] items-center gap-2 text-xs text-muted-foreground">
                           <span>Set</span>
                           <span>Weight (kg)</span>
-                          <span>Reps</span>
+                          <span>{ex.metric === "TIME" ? "Hold (s)" : "Reps"}</span>
                           <span />
                         </div>
                         {(entries[ex.name] ?? []).map((s, idx) => (
@@ -263,15 +265,27 @@ export function WorkoutLogForm({
                               onChange={(e) => updateSet(ex.name, idx, "weightKg", e.target.value)}
                               className="h-9 w-full rounded-md border bg-background px-2 text-sm tabular-nums outline-none focus:border-foreground"
                             />
-                            <input
-                              type="number"
-                              inputMode="numeric"
-                              min="0"
-                              placeholder="—"
-                              value={s.reps}
-                              onChange={(e) => updateSet(ex.name, idx, "reps", e.target.value)}
-                              className="h-9 w-full rounded-md border bg-background px-2 text-sm tabular-nums outline-none focus:border-foreground"
-                            />
+                            {ex.metric === "TIME" ? (
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                placeholder="sec"
+                                value={s.seconds}
+                                onChange={(e) => updateSet(ex.name, idx, "seconds", e.target.value)}
+                                className="h-9 w-full rounded-md border bg-background px-2 text-sm tabular-nums outline-none focus:border-foreground"
+                              />
+                            ) : (
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                placeholder="—"
+                                value={s.reps}
+                                onChange={(e) => updateSet(ex.name, idx, "reps", e.target.value)}
+                                className="h-9 w-full rounded-md border bg-background px-2 text-sm tabular-nums outline-none focus:border-foreground"
+                              />
+                            )}
                             <button
                               type="button"
                               onClick={() => removeSet(ex.name, idx)}

@@ -46,6 +46,7 @@ const planSchema = z.object({
             z.object({
               name: z.string().min(1).max(120),
               muscleGroup: z.string().min(1).max(60),
+              metric: z.enum(["REPS", "TIME"]).optional().default("REPS"),
               targetSets: z.number().int().min(1).max(20),
               repRange: z.string().max(20).optional().nullable(),
               rir: z.number().int().min(0).max(10).optional().nullable(),
@@ -103,6 +104,7 @@ export async function POST(
             create: day.exercises.map((ex, ei) => ({
               name: ex.name,
               muscleGroup: ex.muscleGroup,
+              metric: ex.metric,
               targetSets: ex.targetSets,
               repRange: ex.repRange ?? null,
               rir: ex.rir ?? null,

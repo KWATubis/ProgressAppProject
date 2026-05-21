@@ -47,6 +47,11 @@ enum RunTrainingType {
   GENERIC
 }
 
+enum ExerciseMetric {
+  REPS
+  TIME
+}
+
 model Profile {
   id                String             @id
   email             String             @unique
@@ -170,6 +175,7 @@ model WorkoutPlanExercise {
   day         WorkoutPlanDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
   name        String
   muscleGroup String
+  metric      ExerciseMetric @default(REPS)
   targetSets  Int            @default(3)
   repRange    String?
   rir         Int?

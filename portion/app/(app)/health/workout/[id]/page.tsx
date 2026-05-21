@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { ExerciseSetRow, type ExerciseWithSets } from "@/components/health/ExerciseSetRow";
+import { DeleteSessionButton } from "@/components/health/DeleteSessionButton";
 
 export default async function WorkoutDetailPage({
   params,
@@ -71,7 +72,10 @@ export default async function WorkoutDetailPage({
         >
           <ChevronLeft className="h-3.5 w-3.5" /> All workouts
         </Link>
-        <h2 className="text-xl font-semibold">{session.type}</h2>
+        <div className="flex items-start justify-between gap-2">
+          <h2 className="text-xl font-semibold">{session.type}</h2>
+          <DeleteSessionButton sessionId={session.id} redirectTo="/health/workout" />
+        </div>
         <p className="text-sm text-muted-foreground">{dateStr}</p>
         {session.durationMin && (
           <p className="text-sm text-muted-foreground">{session.durationMin} min</p>

@@ -24,17 +24,27 @@ const TRAINING_TYPES: { value: TrainingType; label: string }[] = [
   { value: "RACE", label: "Race" },
 ];
 
-type Rep = { distanceM: string; timeMin: string; timeSec: string; restMin: string; restSec: string };
+type SegMode = "DIST" | "TIME";
+type Seg = { mode: SegMode; dist: string; min: string; sec: string };
+type Rep = { work: Seg; rest: Seg };
 
+function blankSeg(mode: SegMode): Seg {
+  return { mode, dist: "", min: "", sec: "" };
+}
 function blankRep(): Rep {
-  return { distanceM: "", timeMin: "", timeSec: "", restMin: "", restSec: "" };
+  return { work: blankSeg("DIST"), rest: blankSeg("TIME") };
 }
 
-function repWorkSec(r: Rep): number {
-  return (Number(r.timeMin) || 0) * 60 + (Number(r.timeSec) || 0);
+function segSeconds(s: Seg): number {
+  return (Number(s.min) || 0) * 60 + (Number(s.sec) || 0);
 }
-function repRestSec(r: Rep): number {
-  return (Number(r.restMin) || 0) * 60 + (Number(r.restSec) || 0);
+// Returns a lap payload for a segment, or null if the user left it empty.
+function segToLap(s: Seg, isWork: boolean): { distanceM: number | null; durationSec: number | null; isWork: boolean } | null {
+  const dist = s.dist !== "" ? Number(s.dist) : null;
+  const secs = segSeconds(s);
+  const dur = secs > 0 ? secs : null;
+  if (dist == null && dur == null) return null;
+  return { distanceM: dist, durationSec: dur, isWork };
 }
 function paceStr(secPerKm: number): string {
   return `${Math.floor(secPerKm / 60)}:${String(Math.round(secPerKm % 60)).padStart(2, "0")}`;
@@ -42,8 +52,56 @@ function paceStr(secPerKm: number): string {
 
 const inputClass =
   "h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-foreground";
-const smallInput =
+const small =
   "h-9 w-full rounded-md border bg-background px-2 text-sm tabular-nums text-center outline-none focus:border-foreground";
+
+function SegEditor({
+  label,
+  seg,
+  onChange,
+}: {
+  label: string;
+  seg: Seg;
+  onChange: (s: Seg) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="w-10 shrink-0 text-xs font-medium text-muted-foreground">{label}</span>
+      <div className="flex shrink-0 overflow-hidden rounded-md border">
+        {(["DIST", "TIME"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            onClick={() => onChange({ ...seg, mode: m })}
+            className={cn(
+              "px-2 py-1.5 text-xs font-medium transition-colors",
+              seg.mode === m ? "bg-foreground text-background" : "text-muted-foreground hover:bg-accent",
+            )}
+          >
+            {m === "DIST" ? "Dist" : "Time"}
+          </button>
+        ))}
+      </div>
+      {seg.mode === "DIST" ? (
+        <>
+          <input className={`${small} w-16`} type="number" min="0" placeholder="m" value={seg.dist} onChange={(e) => onChange({ ...seg, dist: e.target.value })} />
+          <span className="text-xs text-muted-foreground">in</span>
+          <div className="flex items-center gap-1">
+            <input className={`${small} w-12`} type="number" min="0" placeholder="m" value={seg.min} onChange={(e) => onChange({ ...seg, min: e.target.value })} />
+            <span className="text-muted-foreground">:</span>
+            <input className={`${small} w-12`} type="number" min="0" max="59" placeholder="s" value={seg.sec} onChange={(e) => onChange({ ...seg, sec: e.target.value })} />
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center gap-1">
+          <input className={`${small} w-14`} type="number" min="0" placeholder="min" value={seg.min} onChange={(e) => onChange({ ...seg, min: e.target.value })} />
+          <span className="text-muted-foreground">:</span>
+          <input className={`${small} w-14`} type="number" min="0" max="59" placeholder="sec" value={seg.sec} onChange={(e) => onChange({ ...seg, sec: e.target.value })} />
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) {
   const [trainingType, setTrainingType] = useState<TrainingType>("EASY");
@@ -64,29 +122,27 @@ export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) 
 
   const isStructured = trainingType === "INTERVAL" || trainingType === "FARTLEK";
 
-  // Steady auto-pace from distance + duration
   const autoPaceSecPerKm =
     distance && duration && Number(distance) > 0
       ? Math.round((Number(duration) * 60) / Number(distance))
       : null;
-  const manualPaceSec =
-    paceMin || paceSec ? Number(paceMin || 0) * 60 + Number(paceSec || 0) : null;
+  const manualPaceSec = paceMin || paceSec ? Number(paceMin || 0) * 60 + Number(paceSec || 0) : null;
   const finalPaceSecPerKm = manualPaceSec ?? autoPaceSecPerKm;
 
-  // Interval totals
-  const totalWorkM = reps.reduce((s, r) => s + (Number(r.distanceM) || 0), 0);
-  const totalWorkSec = reps.reduce((s, r) => s + repWorkSec(r), 0);
-  const totalRestSec = reps.reduce((s, r) => s + repRestSec(r), 0);
-  const intervalAvgPace = totalWorkM > 0 ? Math.round(totalWorkSec / (totalWorkM / 1000)) : null;
+  // Interval totals (work segments only)
+  const workLaps = reps.map((r) => segToLap(r.work, true)).filter((l): l is NonNullable<typeof l> => l != null);
+  const totalWorkM = workLaps.reduce((s, l) => s + (l.distanceM ?? 0), 0);
+  const totalWorkSec = workLaps.reduce((s, l) => s + (l.durationSec ?? 0), 0);
+  const intervalAvgPace = totalWorkM > 0 && totalWorkSec > 0 ? Math.round(totalWorkSec / (totalWorkM / 1000)) : null;
 
-  function updateRep(i: number, field: keyof Rep, value: string) {
-    setReps((prev) => prev.map((r, j) => (j === i ? { ...r, [field]: value } : r)));
+  function updateRep(i: number, part: "work" | "rest", seg: Seg) {
+    setReps((prev) => prev.map((r, j) => (j === i ? { ...r, [part]: seg } : r)));
   }
   function addRep() {
-    // Carry distance from the previous rep to speed up repeated sets.
     setReps((prev) => {
       const last = prev[prev.length - 1];
-      return [...prev, { ...blankRep(), distanceM: last?.distanceM ?? "", restMin: last?.restMin ?? "", restSec: last?.restSec ?? "" }];
+      // Carry the shape (modes + rest value) of the previous rep to speed repeated sets.
+      return [...prev, last ? { work: { ...last.work, dist: last.work.dist, min: "", sec: "" }, rest: { ...last.rest } } : blankRep()];
     });
   }
   function removeRep(i: number) {
@@ -95,22 +151,22 @@ export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) 
 
   function submit() {
     if (isStructured) {
-      const laps = reps
-        .filter((r) => Number(r.distanceM) > 0 && repWorkSec(r) > 0)
-        .map((r) => ({
-          distanceM: Number(r.distanceM),
-          durationSec: repWorkSec(r),
-          recoverySec: repRestSec(r) || null,
-        }));
-      if (laps.length === 0) {
-        toast.error("Add at least one rep with distance and time.");
+      const laps: { distanceM: number | null; durationSec: number | null; isWork: boolean }[] = [];
+      for (const r of reps) {
+        const w = segToLap(r.work, true);
+        if (w) laps.push(w);
+        const rest = segToLap(r.rest, false);
+        if (rest) laps.push(rest);
+      }
+      if (laps.filter((l) => l.isWork).length === 0) {
+        toast.error("Add at least one work rep with a distance or time.");
         return;
       }
       send({
         type: activityName,
         trainingType,
-        distanceKm: totalWorkM / 1000,
-        durationMin: Math.round((totalWorkSec + totalRestSec) / 60) || null,
+        distanceKm: totalWorkM > 0 ? totalWorkM / 1000 : null,
+        durationMin: Math.round(laps.reduce((s, l) => s + (l.durationSec ?? 0), 0) / 60) || null,
         avgPaceSecPerKm: intervalAvgPace,
         laps,
       });
@@ -180,45 +236,22 @@ export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) 
       </div>
 
       {isStructured ? (
-        /* ─── Per-rep interval builder ─── */
         <div className="space-y-3">
-          <div className="grid grid-cols-[1.5rem_1fr_1.4fr_1.4fr_1.75rem] items-center gap-2 text-xs text-muted-foreground">
-            <span>#</span>
-            <span>Dist (m)</span>
-            <span>Time m:s</span>
-            <span>Rest m:s</span>
-            <span />
-          </div>
           {reps.map((r, i) => (
-            <div key={i} className="grid grid-cols-[1.5rem_1fr_1.4fr_1.4fr_1.75rem] items-center gap-2">
-              <span className="text-sm tabular-nums text-muted-foreground">{i + 1}</span>
-              <input
-                className={smallInput}
-                type="number"
-                inputMode="numeric"
-                min="0"
-                placeholder="300"
-                value={r.distanceM}
-                onChange={(e) => updateRep(i, "distanceM", e.target.value)}
-              />
-              <div className="flex items-center gap-1">
-                <input className={smallInput} type="number" min="0" placeholder="0" value={r.timeMin} onChange={(e) => updateRep(i, "timeMin", e.target.value)} />
-                <span className="text-muted-foreground">:</span>
-                <input className={smallInput} type="number" min="0" max="59" placeholder="51" value={r.timeSec} onChange={(e) => updateRep(i, "timeSec", e.target.value)} />
+            <div key={i} className="space-y-2 rounded-lg border bg-card p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">Rep {i + 1}</span>
+                <button
+                  type="button"
+                  onClick={() => removeRep(i)}
+                  className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  aria-label="Remove rep"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <div className="flex items-center gap-1">
-                <input className={smallInput} type="number" min="0" placeholder="3" value={r.restMin} onChange={(e) => updateRep(i, "restMin", e.target.value)} />
-                <span className="text-muted-foreground">:</span>
-                <input className={smallInput} type="number" min="0" max="59" placeholder="00" value={r.restSec} onChange={(e) => updateRep(i, "restSec", e.target.value)} />
-              </div>
-              <button
-                type="button"
-                onClick={() => removeRep(i)}
-                className="flex h-9 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label="Remove rep"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <SegEditor label="Work" seg={r.work} onChange={(s) => updateRep(i, "work", s)} />
+              <SegEditor label="Rest" seg={r.rest} onChange={(s) => updateRep(i, "rest", s)} />
             </div>
           ))}
           <button
@@ -231,25 +264,15 @@ export function CardioLogForm({ dateISO, activityTypeId, activityName }: Props) 
 
           {totalWorkM > 0 && (
             <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg border bg-card p-3 text-sm">
-              <span>
-                <span className="tabular-nums font-medium">{(totalWorkM / 1000).toFixed(2)}</span>
-                <span className="text-muted-foreground"> km work</span>
-              </span>
-              <span>
-                <span className="tabular-nums font-medium">{reps.filter((r) => Number(r.distanceM) > 0).length}</span>
-                <span className="text-muted-foreground"> reps</span>
-              </span>
+              <span><span className="font-medium tabular-nums">{(totalWorkM / 1000).toFixed(2)}</span><span className="text-muted-foreground"> km work</span></span>
+              <span><span className="font-medium tabular-nums">{workLaps.length}</span><span className="text-muted-foreground"> reps</span></span>
               {intervalAvgPace != null && (
-                <span>
-                  <span className="tabular-nums font-medium">{paceStr(intervalAvgPace)}</span>
-                  <span className="text-muted-foreground"> /km avg</span>
-                </span>
+                <span><span className="font-medium tabular-nums">{paceStr(intervalAvgPace)}</span><span className="text-muted-foreground"> /km avg</span></span>
               )}
             </div>
           )}
         </div>
       ) : (
-        /* ─── Steady run ─── */
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Distance (km)</label>
