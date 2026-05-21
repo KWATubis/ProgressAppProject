@@ -16,11 +16,22 @@ const exerciseSchema = z.object({
   sets: z.array(setSchema).min(1),
 });
 
+const runSchema = z.object({
+  type: z.string().min(1).max(60),
+  distanceKm: z.number().min(0).optional().nullable(),
+  durationMin: z.number().int().min(0).optional().nullable(),
+  avgPaceSecPerKm: z.number().int().min(0).optional().nullable(),
+  avgHRBpm: z.number().int().min(0).optional().nullable(),
+});
+
 const createSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   type: z.string().min(1).max(60),
+  activityTypeId: z.string().optional().nullable(),
+  durationMin: z.number().int().min(0).optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
-  exercises: z.array(exerciseSchema).min(1),
+  exercises: z.array(exerciseSchema).optional().default([]),
+  runs: z.array(runSchema).optional().default([]),
 });
 
 export async function POST(req: Request) {
@@ -40,7 +51,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Drop sets with no data entered, then exercises left with no logged sets.
+  // Drop sets with no data, then exercises left with no sets.
   const exercises = body.exercises
     .map((ex) => ({
       ...ex,
@@ -48,8 +59,8 @@ export async function POST(req: Request) {
     }))
     .filter((ex) => ex.sets.length > 0);
 
-  if (exercises.length === 0) {
-    return NextResponse.json({ error: "Log at least one set" }, { status: 400 });
+  if (exercises.length === 0 && body.runs.length === 0 && !body.durationMin) {
+    return NextResponse.json({ error: "Log at least one set, run, or duration" }, { status: 400 });
   }
 
   const session = await prisma.workoutSession.create({
@@ -57,24 +68,39 @@ export async function POST(req: Request) {
       profileId: user.id,
       date: parseISODate(body.date),
       type: body.type,
+      activityTypeId: body.activityTypeId ?? null,
+      durationMin: body.durationMin ?? null,
       notes: body.notes ?? null,
-      exercises: {
-        create: exercises.flatMap((ex) =>
-          ex.sets.map((s) => ({
-            setNumber: s.setNumber,
-            reps: s.reps ?? null,
-            weightKg: s.weightKg ?? null,
-            exercise: {
-              connectOrCreate: {
-                where: { name: ex.name },
-                create: { name: ex.name, category: ex.muscleGroup },
-              },
-            },
-          })),
-        ),
-      },
+      exercises: exercises.length > 0
+        ? {
+            create: exercises.flatMap((ex) =>
+              ex.sets.map((s) => ({
+                setNumber: s.setNumber,
+                reps: s.reps ?? null,
+                weightKg: s.weightKg ?? null,
+                exercise: {
+                  connectOrCreate: {
+                    where: { name: ex.name },
+                    create: { name: ex.name, category: ex.muscleGroup },
+                  },
+                },
+              })),
+            ),
+          }
+        : undefined,
+      runs: body.runs.length > 0
+        ? {
+            create: body.runs.map((r) => ({
+              type: r.type,
+              distanceKm: r.distanceKm ?? null,
+              durationMin: r.durationMin ?? null,
+              avgPaceSecPerKm: r.avgPaceSecPerKm ?? null,
+              avgHRBpm: r.avgHRBpm ?? null,
+            })),
+          }
+        : undefined,
     },
-    include: { exercises: true },
+    include: { exercises: true, runs: true },
   });
 
   return NextResponse.json({ session });

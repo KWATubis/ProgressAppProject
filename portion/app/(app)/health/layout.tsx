@@ -8,10 +8,10 @@ export default async function HealthLayout({ children }: { children: React.React
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth/login");
 
-  const folders = await prisma.healthFolder.findMany({
+  const activityTypes = await prisma.activityType.findMany({
     where: { profileId: user.id },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, icon: true },
+    select: { id: true, name: true, slug: true, icon: true, kind: true },
   });
 
   return (
@@ -19,7 +19,7 @@ export default async function HealthLayout({ children }: { children: React.React
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Health</h1>
         <p className="text-sm text-muted-foreground">Training, nutrition, and body metrics.</p>
-        <HealthSubNav folders={folders} />
+        <HealthSubNav activityTypes={activityTypes} />
       </div>
       {children}
     </div>

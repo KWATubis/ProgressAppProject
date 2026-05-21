@@ -18,7 +18,7 @@ export default async function CheckInPage() {
   const today = toUtcMidnight();
   const todayISO = formatISODate(today);
 
-  const [tasks, logsToday, dietToday, metricToday] = await Promise.all([
+  const [tasks, logsToday, dietToday, metricToday, activityTypes] = await Promise.all([
     prisma.task.findMany({
       where: { profileId: user.id, isActive: true },
       orderBy: { sortOrder: "asc" },
@@ -27,6 +27,11 @@ export default async function CheckInPage() {
     prisma.dietLog.findMany({ where: { profileId: user.id, date: today }, orderBy: { createdAt: "asc" } }),
     prisma.bodyMetric.findUnique({
       where: { profileId_date: { profileId: user.id, date: today } },
+    }),
+    prisma.activityType.findMany({
+      where: { profileId: user.id },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, slug: true, icon: true, kind: true },
     }),
   ]);
 
@@ -68,7 +73,13 @@ export default async function CheckInPage() {
           {today.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </p>
       </div>
-      <DailyCheckInPage dateISO={todayISO} tasks={todayTasks} meals={meals} metric={metric} />
+      <DailyCheckInPage
+        dateISO={todayISO}
+        tasks={todayTasks}
+        meals={meals}
+        metric={metric}
+        activityTypes={activityTypes}
+      />
     </div>
   );
 }

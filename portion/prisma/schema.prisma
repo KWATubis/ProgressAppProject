@@ -30,6 +30,12 @@ enum MealSlot {
   SNACK
 }
 
+enum ActivityKind {
+  STRENGTH
+  CARDIO
+  SPORT
+}
+
 model Profile {
   id                String             @id
   email             String             @unique
@@ -44,7 +50,7 @@ model Profile {
   bodyMetrics       BodyMetric[]
   socialMetrics     SocialMetric[]
   incomeEntries     IncomeEntry[]
-  healthFolders     HealthFolder[]
+  activityTypes     ActivityType[]
   onboardingSession OnboardingSession?
 }
 
@@ -111,18 +117,69 @@ model TaskLog {
   @@unique([taskId, date])
 }
 
-model WorkoutSession {
-  id          String        @id @default(cuid())
-  profileId   String
-  profile     Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  date        DateTime
-  type        String
-  durationMin Int?
+model ActivityType {
+  id             String           @id @default(cuid())
+  profileId      String
+  profile        Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  icon           String?
+  kind           ActivityKind
+  workoutPlan    WorkoutPlan?
+  sessions       WorkoutSession[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([profileId, slug])
+}
+
+model WorkoutPlan {
+  id             String           @id @default(cuid())
+  profileId      String
+  activityTypeId String           @unique
+  activityType   ActivityType     @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
+  name           String
+  days           WorkoutPlanDay[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model WorkoutPlanDay {
+  id        String               @id @default(cuid())
+  planId    String
+  plan      WorkoutPlan          @relation(fields: [planId], references: [id], onDelete: Cascade)
+  label     String
+  sortOrder Int                  @default(0)
+  exercises WorkoutPlanExercise[]
+}
+
+model WorkoutPlanExercise {
+  id          String         @id @default(cuid())
+  dayId       String
+  day         WorkoutPlanDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  name        String
+  muscleGroup String
+  targetSets  Int            @default(3)
+  repRange    String?
+  rir         Int?
   notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  exercises   ExerciseSet[]
-  runs        RunEntry[]
+  sortOrder   Int            @default(0)
+}
+
+model WorkoutSession {
+  id             String        @id @default(cuid())
+  profileId      String
+  profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  activityTypeId String?
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id], onDelete: SetNull)
+  date           DateTime
+  type           String
+  durationMin    Int?
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  exercises      ExerciseSet[]
+  runs           RunEntry[]
 }
 
 model Exercise {
@@ -153,6 +210,7 @@ model RunEntry {
   distanceKm      Float?
   durationMin     Int?
   avgPaceSecPerKm Int?
+  avgHRBpm        Int?
 }
 
 model DietLog {
@@ -211,18 +269,4 @@ model IncomeEntry {
   amountPln   Float
   description String?
   createdAt   DateTime @default(now())
-}
-
-model HealthFolder {
-  id          String   @id @default(cuid())
-  profileId   String
-  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  name        String
-  slug        String
-  icon        String?
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([profileId, slug])
 }

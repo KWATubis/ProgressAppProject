@@ -7,12 +7,12 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const folders = await prisma.healthFolder.findMany({
+  const activities = await prisma.activityType.findMany({
     where: { profileId: user.id },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, icon: true },
+    select: { id: true, name: true, slug: true, icon: true, kind: true },
   });
-  return NextResponse.json(folders);
+  return NextResponse.json(activities);
 }
 
 export async function POST(request: Request) {
@@ -22,27 +22,26 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const name: string = (body.name ?? "").trim();
+  const kind: string = body.kind ?? "";
+  const icon: string | null = body.icon || null;
+
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
+  if (!["STRENGTH", "CARDIO", "SPORT"].includes(kind)) {
+    return NextResponse.json({ error: "Invalid kind" }, { status: 400 });
+  }
 
   const slug = name
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "");
-
   if (!slug) return NextResponse.json({ error: "Invalid name" }, { status: 400 });
 
   try {
-    const folder = await prisma.healthFolder.create({
-      data: {
-        profileId: user.id,
-        name,
-        slug,
-        icon: body.icon || null,
-        description: body.description || null,
-      },
+    const activity = await prisma.activityType.create({
+      data: { profileId: user.id, name, slug, icon, kind: kind as "STRENGTH" | "CARDIO" | "SPORT" },
     });
-    return NextResponse.json(folder, { status: 201 });
+    return NextResponse.json(activity, { status: 201 });
   } catch {
-    return NextResponse.json({ error: "A folder with that name already exists" }, { status: 409 });
+    return NextResponse.json({ error: "An activity with that name already exists" }, { status: 409 });
   }
 }

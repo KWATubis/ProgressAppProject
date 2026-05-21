@@ -6,16 +6,26 @@ import { WorkoutLogForm } from "./WorkoutLogForm";
 import { DietLogForm, type Meal } from "./DietLogForm";
 import { BodyMetricForm, type MetricValues } from "./BodyMetricForm";
 
+type ActivityType = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  kind: "STRENGTH" | "CARDIO" | "SPORT";
+};
+
 export function DailyCheckInPage({
   dateISO,
   tasks,
   meals,
   metric,
+  activityTypes,
 }: {
   dateISO: string;
   tasks: TodayTask[];
   meals: Meal[];
   metric: MetricValues;
+  activityTypes: ActivityType[];
 }) {
   return (
     <Tabs defaultValue="tasks" className="w-full">
@@ -31,7 +41,7 @@ export function DailyCheckInPage({
       </TabsContent>
 
       <TabsContent value="workout" className="mt-4">
-        <WorkoutLogForm dateISO={dateISO} />
+        <WorkoutLogForm dateISO={dateISO} activityTypes={activityTypes} />
       </TabsContent>
 
       <TabsContent value="diet" className="mt-4">
