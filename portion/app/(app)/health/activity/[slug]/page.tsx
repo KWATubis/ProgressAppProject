@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { CardioProgressChart, type CardioDataPoint } from "@/components/charts/CardioProgressChart";
+import { PlanSection } from "@/components/health/PlanSection";
+import { GarminUploadButton } from "@/components/health/GarminUploadButton";
+import { CardioSessionCard, type CardioSessionView } from "@/components/health/CardioSessionCard";
 
 function paceStr(secPerKm: number) {
   return `${Math.floor(secPerKm / 60)}:${String(secPerKm % 60).padStart(2, "0")}`;
@@ -40,24 +43,43 @@ export default async function ActivityPage({
     orderBy: { date: "desc" },
     include: {
       exercises: { include: { exercise: true } },
-      runs: true,
+      runs: { include: { laps: { orderBy: { lapIndex: "asc" } } } },
     },
   });
 
   const header = (
-    <div className="flex items-start justify-between">
+    <div className="flex items-start justify-between gap-2">
       <h2 className="text-xl font-semibold">
         {activity.icon && <span className="mr-2">{activity.icon}</span>}
         {activity.name}
       </h2>
-      <Link href="/check-in">
-        <Button size="sm">Log session</Button>
-      </Link>
+      <div className="flex items-center gap-2">
+        {activity.kind === "CARDIO" && <GarminUploadButton />}
+        <Link href="/check-in">
+          <Button size="sm">Log session</Button>
+        </Link>
+      </div>
     </div>
   );
 
   // ─── STRENGTH ───────────────────────────────────────────────────────────────
   if (activity.kind === "STRENGTH") {
+    const planInitial = activity.workoutPlan
+      ? {
+          name: activity.workoutPlan.name,
+          days: activity.workoutPlan.days.map((d) => ({
+            label: d.label,
+            exercises: d.exercises.map((ex) => ({
+              name: ex.name,
+              muscleGroup: ex.muscleGroup,
+              targetSets: ex.targetSets,
+              repRange: ex.repRange,
+              rir: ex.rir,
+            })),
+          })),
+        }
+      : null;
+
     return (
       <div className="space-y-6">
         {header}
@@ -88,6 +110,8 @@ export default async function ActivityPage({
             </div>
           </section>
         )}
+
+        <PlanSection slug={activity.slug} activityName={activity.name} initial={planInitial} />
 
         {/* Session history */}
         <section className="space-y-2">
@@ -186,33 +210,38 @@ export default async function ActivityPage({
         <section className="space-y-2">
           {sessions.length === 0 ? (
             <div className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
-              <p>No sessions yet. Log your first {activity.name} session in Check-in.</p>
+              <p>No sessions yet. Log your first {activity.name} session in Check-in, or upload from Garmin.</p>
             </div>
           ) : (
             sessions.map((session) => {
-              const dateStr = session.date.toLocaleDateString("en-GB", {
-                day: "numeric", month: "short", year: "numeric",
-              });
-              const runKm = session.runs.reduce((s, r) => s + (r.distanceKm ?? 0), 0);
-              const firstRun = session.runs[0];
-              return (
-                <div key={session.id} className="rounded-xl border bg-card p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{dateStr}</span>
-                    {session.durationMin && (
-                      <span className="text-sm text-muted-foreground">{session.durationMin} min</span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {runKm > 0 ? `${runKm.toFixed(2)} km` : "—"}
-                    {firstRun?.avgPaceSecPerKm != null && ` · ${paceStr(firstRun.avgPaceSecPerKm)} /km`}
-                    {firstRun?.avgHRBpm != null && ` · ${firstRun.avgHRBpm} bpm`}
-                  </p>
-                  {session.notes && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{session.notes}</p>
-                  )}
-                </div>
-              );
+              const run = session.runs[0];
+              const view: CardioSessionView = {
+                id: session.id,
+                dateStr: session.date.toLocaleDateString("en-GB", {
+                  day: "numeric", month: "short", year: "numeric",
+                }),
+                trainingType: run?.trainingType ?? null,
+                source: session.source,
+                distanceKm: run?.distanceKm ?? null,
+                durationMin: run?.durationMin ?? session.durationMin ?? null,
+                avgPaceSecPerKm: run?.avgPaceSecPerKm ?? null,
+                avgHRBpm: run?.avgHRBpm ?? null,
+                maxHRBpm: run?.maxHRBpm ?? null,
+                calories: run?.calories ?? null,
+                elevationGainM: run?.elevationGainM ?? null,
+                avgCadence: run?.avgCadence ?? null,
+                notes: session.notes,
+                laps: (run?.laps ?? []).map((l) => ({
+                  lapIndex: l.lapIndex,
+                  distanceM: l.distanceM,
+                  durationSec: l.durationSec,
+                  avgPaceSecPerKm: l.avgPaceSecPerKm,
+                  avgHRBpm: l.avgHRBpm,
+                  isWork: l.isWork,
+                  recoverySec: l.recoverySec,
+                })),
+              };
+              return <CardioSessionCard key={session.id} session={view} />;
             })
           )}
         </section>

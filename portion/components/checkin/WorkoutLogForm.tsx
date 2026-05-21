@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { Plus, X, Check, Dumbbell } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CardioLogForm } from "./CardioLogForm";
 import { SportLogForm } from "./SportLogForm";
+import { GarminUploadButton } from "@/components/health/GarminUploadButton";
 
 type ActivityType = {
   id: string;
@@ -151,14 +153,22 @@ export function WorkoutLogForm({
 
   if (!selected) {
     return (
-      <p className="text-sm text-muted-foreground">
-        No activities set up yet. Add one in Health → +.
-      </p>
+      <div className="space-y-3 rounded-lg border border-dashed p-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          No activities set up yet. Add one in Health → +, or import a watch session.
+        </p>
+        <GarminUploadButton />
+      </div>
     );
   }
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-between gap-2 border-b pb-3">
+        <span className="text-xs text-muted-foreground">Track a watch session?</span>
+        <GarminUploadButton />
+      </div>
+
       {/* Activity type selector */}
       {activityTypes.length > 1 && (
         <div className="flex flex-wrap gap-2">
@@ -185,7 +195,15 @@ export function WorkoutLogForm({
         planLoading ? (
           <p className="text-sm text-muted-foreground">Loading plan…</p>
         ) : !plan ? (
-          <p className="text-sm text-muted-foreground">No workout plan found for {selected.name}.</p>
+          <div className="rounded-lg border border-dashed p-6 text-center">
+            <p className="text-sm text-muted-foreground">No workout plan found for {selected.name}.</p>
+            <Link
+              href={`/health/activity/${selected.slug}`}
+              className="mt-2 inline-block text-sm font-medium text-emerald-400 transition-colors hover:text-emerald-300"
+            >
+              Build a plan →
+            </Link>
+          </div>
         ) : (
           <>
             <div className="flex flex-wrap gap-2">

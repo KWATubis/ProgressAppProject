@@ -16,12 +16,24 @@ const exerciseSchema = z.object({
   sets: z.array(setSchema).min(1),
 });
 
+const lapSchema = z.object({
+  distanceM: z.number().min(0).max(100000).optional().nullable(),
+  durationSec: z.number().min(0).max(86400).optional().nullable(),
+  recoverySec: z.number().int().min(0).max(86400).optional().nullable(),
+  avgHRBpm: z.number().int().min(0).max(250).optional().nullable(),
+});
+
 const runSchema = z.object({
   type: z.string().min(1).max(60),
+  trainingType: z
+    .enum(["EASY", "LONG", "TEMPO", "INTERVAL", "FARTLEK", "RECOVERY", "RACE", "GENERIC"])
+    .optional()
+    .nullable(),
   distanceKm: z.number().min(0).optional().nullable(),
   durationMin: z.number().int().min(0).optional().nullable(),
   avgPaceSecPerKm: z.number().int().min(0).optional().nullable(),
   avgHRBpm: z.number().int().min(0).optional().nullable(),
+  laps: z.array(lapSchema).optional().default([]),
 });
 
 const createSchema = z.object({
@@ -92,10 +104,27 @@ export async function POST(req: Request) {
         ? {
             create: body.runs.map((r) => ({
               type: r.type,
+              trainingType: r.trainingType ?? null,
               distanceKm: r.distanceKm ?? null,
               durationMin: r.durationMin ?? null,
               avgPaceSecPerKm: r.avgPaceSecPerKm ?? null,
               avgHRBpm: r.avgHRBpm ?? null,
+              laps: r.laps.length > 0
+                ? {
+                    create: r.laps.map((l, i) => ({
+                      lapIndex: i,
+                      distanceM: l.distanceM ?? null,
+                      durationSec: l.durationSec ?? null,
+                      avgPaceSecPerKm:
+                        l.distanceM && l.durationSec && l.distanceM > 0
+                          ? Math.round((l.durationSec * 1000) / l.distanceM)
+                          : null,
+                      avgHRBpm: l.avgHRBpm ?? null,
+                      recoverySec: l.recoverySec ?? null,
+                      isWork: true,
+                    })),
+                  }
+                : undefined,
             })),
           }
         : undefined,

@@ -36,6 +36,17 @@ enum ActivityKind {
   SPORT
 }
 
+enum RunTrainingType {
+  EASY
+  LONG
+  TEMPO
+  INTERVAL
+  FARTLEK
+  RECOVERY
+  RACE
+  GENERIC
+}
+
 model Profile {
   id                String             @id
   email             String             @unique
@@ -176,10 +187,14 @@ model WorkoutSession {
   type           String
   durationMin    Int?
   notes          String?
+  source         String        @default("manual")
+  externalId     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   exercises      ExerciseSet[]
   runs           RunEntry[]
+
+  @@unique([profileId, externalId])
 }
 
 model Exercise {
@@ -203,14 +218,35 @@ model ExerciseSet {
 }
 
 model RunEntry {
-  id              String         @id @default(cuid())
+  id              String           @id @default(cuid())
   sessionId       String
-  session         WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session         WorkoutSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   type            String
+  trainingType    RunTrainingType?
   distanceKm      Float?
   durationMin     Int?
   avgPaceSecPerKm Int?
   avgHRBpm        Int?
+  maxHRBpm        Int?
+  calories        Int?
+  elevationGainM  Int?
+  avgCadence      Int?
+  laps            RunLap[]
+}
+
+model RunLap {
+  id              String   @id @default(cuid())
+  runEntryId      String
+  runEntry        RunEntry @relation(fields: [runEntryId], references: [id], onDelete: Cascade)
+  lapIndex        Int
+  distanceM       Float?
+  durationSec     Float?
+  avgPaceSecPerKm Int?
+  avgHRBpm        Int?
+  maxHRBpm        Int?
+  avgCadence      Int?
+  isWork          Boolean  @default(true)
+  recoverySec     Int?
 }
 
 model DietLog {
