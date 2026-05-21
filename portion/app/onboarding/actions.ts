@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import type { WizardPlan } from "./types";
 
 const goalSchema = z.object({
@@ -94,7 +95,7 @@ export async function savePlan(planJson: string): Promise<SaveResult> {
     const firstHealthGoalId = createdGoals.find((g) => g.pillar === "HEALTH")?.id ?? null;
     const firstMoneyGoalId = createdGoals.find((g) => g.pillar === "MONEY")?.id ?? null;
 
-    const habitInserts: Parameters<typeof prisma.task.create>[0]["data"][] = [];
+    const habitInserts: Prisma.TaskCreateManyInput[] = [];
 
     for (const h of parsed.health.habits) {
       if (!h.checked || !h.title.trim()) continue;
