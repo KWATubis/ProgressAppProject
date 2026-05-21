@@ -222,7 +222,7 @@ export function PlanEditor({
                 </div>
                 <div className="flex items-center gap-1.5 text-sm">
                   <input
-                    className={`${input} w-10 px-1 text-center tabular-nums`}
+                    className="h-9 w-12 shrink-0 rounded-md border bg-background px-1 text-center text-sm tabular-nums outline-none focus:border-foreground"
                     type="number"
                     min="1"
                     value={ex.targetSets}
@@ -230,7 +230,7 @@ export function PlanEditor({
                   />
                   <span className="text-xs text-muted-foreground">sets ×</span>
                   <input
-                    className={`${input} w-16 px-1.5 text-center tabular-nums`}
+                    className="h-9 w-20 shrink-0 rounded-md border bg-background px-1.5 text-center text-sm tabular-nums outline-none focus:border-foreground"
                     placeholder={ex.metric === "TIME" ? "20–30s" : "8–12"}
                     value={ex.repRange}
                     onChange={(e) => updateExercise(di, ei, "repRange", e.target.value)}

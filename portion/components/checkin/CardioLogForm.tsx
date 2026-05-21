@@ -61,7 +61,7 @@ function paceStr(secPerKm: number): string {
 const inputClass =
   "h-9 w-full rounded-md border bg-background px-3 text-sm outline-none focus:border-foreground";
 const small =
-  "h-9 w-full rounded-md border bg-background px-2 text-sm tabular-nums text-center outline-none focus:border-foreground";
+  "h-9 rounded-md border bg-background px-2 text-sm tabular-nums text-center outline-none focus:border-foreground";
 
 function SegEditor({
   label,
