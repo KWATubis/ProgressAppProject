@@ -2,24 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  CheckSquare,
-  CalendarDays,
-  Dumbbell,
-  Wallet,
-  TrendingUp,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/check-in", label: "Daily check-in", icon: CheckSquare },
-  { href: "/tasks", label: "Tasks", icon: CalendarDays },
-  { href: "/health", label: "Health", icon: Dumbbell },
-  { href: "/money", label: "Money", icon: Wallet },
-  { href: "/progress", label: "Progress", icon: TrendingUp },
-];
+import { navItems, isNavItemActive } from "./nav-items";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -35,9 +19,7 @@ export function Sidebar() {
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const active =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          const active = isNavItemActive(pathname, item.href);
           return (
             <Link
               key={item.href}
