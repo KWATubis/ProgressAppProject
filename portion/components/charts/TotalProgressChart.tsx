@@ -1,0 +1,81 @@
+"use client";
+
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Area,
+  AreaChart,
+} from "recharts";
+
+export type ProgressPoint = { date: string; score: number };
+
+export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+        Complete your tasks to start tracking progress.
+      </div>
+    );
+  }
+
+  const formatted = data.map((d) => {
+    const [y, m, day] = d.date.split("-").map(Number);
+    const label = new Date(y, m - 1, day).toLocaleDateString("en-GB", {
+      month: "short",
+      day: "numeric",
+    });
+    return { score: d.score, label };
+  });
+
+  return (
+    <ResponsiveContainer width="100%" height={180}>
+      <AreaChart data={formatted} margin={{ top: 8, right: 12, left: -28, bottom: 0 }}>
+        <defs>
+          <linearGradient id="progressGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.25} />
+            <stop offset="100%" stopColor="#fbbf24" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+        <XAxis
+          dataKey="label"
+          tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+          tickLine={false}
+          axisLine={false}
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
+          tickLine={false}
+          axisLine={false}
+          allowDecimals={false}
+        />
+        <Tooltip
+          contentStyle={{
+            background: "hsl(var(--card))",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "8px",
+            fontSize: 12,
+          }}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          formatter={(v: any) => [`${v} perfect days`, "Progress"]}
+          labelStyle={{ color: "rgba(255,255,255,0.4)", marginBottom: 2 }}
+          cursor={{ stroke: "rgba(255,255,255,0.08)" }}
+        />
+        <Area
+          type="monotone"
+          dataKey="score"
+          stroke="#fbbf24"
+          strokeWidth={2}
+          fill="url(#progressGrad)"
+          dot={false}
+          activeDot={{ r: 4, fill: "#fbbf24", strokeWidth: 0 }}
+        />
+      </AreaChart>
+    </ResponsiveContainer>
+  );
+}

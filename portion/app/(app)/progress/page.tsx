@@ -7,6 +7,7 @@ import { MacroChart, type MacroDay } from "@/components/charts/MacroChart";
 import { WorkoutVolumeChart, type VolumeWeek } from "@/components/charts/WorkoutVolumeChart";
 import { SocialGrowthChart, type FollowerDataPoint } from "@/components/charts/SocialGrowthChart";
 import { IncomeChart, type IncomeMonth } from "@/components/charts/IncomeChart";
+import { TotalProgressChart, type ProgressPoint } from "@/components/charts/TotalProgressChart";
 import { RangeSelector, type Range } from "./RangeSelector";
 
 const RANGE_DAYS: Record<Range, number | null> = {
@@ -45,7 +46,7 @@ export default async function ProgressPage({
   const since = days != null ? addDays(today, -days) : undefined;
   const dateFilter = since ? { gte: since } : undefined;
 
-  const [weightMetrics, dietLogs, workoutSessions, socialMetrics, incomeEntries, goals] =
+  const [weightMetrics, dietLogs, workoutSessions, socialMetrics, incomeEntries, goals, allTaskLogs] =
     await Promise.all([
       prisma.bodyMetric.findMany({
         where: { profileId: user.id, date: dateFilter, weightKg: { not: null } },
@@ -68,18 +69,40 @@ export default async function ProgressPage({
         where: { profileId: user.id, date: dateFilter },
         orderBy: { date: "asc" },
       }),
-      prisma.goal.findMany({
-        where: { profileId: user.id, isActive: true },
+      prisma.goal.findMany({ where: { profileId: user.id, isActive: true } }),
+      // Always all-time for the cumulative score
+      prisma.taskLog.findMany({
+        where: { profileId: user.id },
+        orderBy: { date: "asc" },
+        select: { date: true, status: true },
       }),
     ]);
 
-  // Weight
+  // --- Total progress (cumulative perfect days, all-time) ---
+  const logsByDate = new Map<string, { hasComplete: boolean; hasPending: boolean }>();
+  for (const log of allTaskLogs) {
+    const key = formatISODate(log.date);
+    const prev = logsByDate.get(key) ?? { hasComplete: false, hasPending: false };
+    logsByDate.set(key, {
+      hasComplete: prev.hasComplete || log.status === "COMPLETE",
+      hasPending: prev.hasPending || log.status === "PENDING",
+    });
+  }
+  let running = 0;
+  const progressData: ProgressPoint[] = Array.from(logsByDate.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, { hasComplete, hasPending }]) => {
+      if (hasComplete && !hasPending) running++;
+      return { date, score: running };
+    });
+
+  // --- Weight ---
   const weightData: WeightDataPoint[] = weightMetrics.map((m) => ({
     date: formatISODate(m.date),
     weightKg: m.weightKg!,
   }));
 
-  // Calories per day
+  // --- Daily calories ---
   const dietByDate = new Map<string, { kcal: number; proteinG: number; fatG: number; carbsG: number }>();
   for (const log of dietLogs) {
     const key = formatISODate(log.date);
@@ -95,39 +118,37 @@ export default async function ProgressPage({
     .map(([date, t]) => ({ date, ...t }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Workout volume per week (reps × weightKg summed per set)
+  // --- Weekly workout volume ---
   const volumeByWeek = new Map<string, number>();
   for (const session of workoutSessions) {
     const week = mondayOf(session.date);
-    let sessionVol = 0;
+    let vol = 0;
     for (const set of session.exercises) {
-      if (set.reps != null && set.weightKg != null) {
-        sessionVol += set.reps * set.weightKg;
-      }
+      if (set.reps != null && set.weightKg != null) vol += set.reps * set.weightKg;
     }
-    volumeByWeek.set(week, (volumeByWeek.get(week) ?? 0) + sessionVol);
+    volumeByWeek.set(week, (volumeByWeek.get(week) ?? 0) + vol);
   }
   const volumeData: VolumeWeek[] = Array.from(volumeByWeek.entries())
     .map(([week, volumeKg]) => ({ week, volumeKg }))
     .sort((a, b) => a.week.localeCompare(b.week));
 
-  // Followers
+  // --- Followers ---
   const followerData: FollowerDataPoint[] = socialMetrics.map((m) => ({
     date: formatISODate(m.date),
     followerCount: m.followerCount,
   }));
 
-  // Income per month
+  // --- Monthly income ---
   const incomeByMonth = new Map<string, number>();
   for (const entry of incomeEntries) {
-    const month = formatISODate(entry.date).slice(0, 7); // YYYY-MM
+    const month = formatISODate(entry.date).slice(0, 7);
     incomeByMonth.set(month, (incomeByMonth.get(month) ?? 0) + entry.amountPln);
   }
   const incomeData: IncomeMonth[] = Array.from(incomeByMonth.entries())
     .map(([month, amountPln]) => ({ month, amountPln }))
     .sort((a, b) => a.month.localeCompare(b.month));
 
-  // Targets from goals
+  // Targets
   const followerGoal = goals.find(
     (g) => g.pillar === "MONEY" && g.unit?.toLowerCase().includes("follower")
   );
@@ -136,7 +157,8 @@ export default async function ProgressPage({
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10">
+    <div className="mx-auto max-w-5xl space-y-10">
+      {/* Header */}
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
@@ -145,57 +167,51 @@ export default async function ProgressPage({
         <RangeSelector current={range} />
       </div>
 
+      {/* Total progress — always all-time, always full width */}
+      <section className="space-y-3">
+        <div>
+          <p className="text-sm font-semibold">Total Progress</p>
+          <p className="text-xs text-muted-foreground">
+            Cumulative days where every task was completed — {running} so far.
+          </p>
+        </div>
+        <TotalProgressChart data={progressData} />
+      </section>
+
+      <div className="h-px bg-white/8" />
+
       {/* Health */}
       <section className="space-y-6">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Health
-        </h2>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Weight</p>
-          <div className="rounded-lg border border-white/10 bg-card p-4">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Health</p>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-8 md:grid-cols-2">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Weight</p>
             <WeightProgressChart data={weightData} />
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Daily Calories</p>
-          <div className="rounded-lg border border-white/10 bg-card p-4">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Daily Calories</p>
             <MacroChart data={macroData} />
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Weekly Workout Volume</p>
-          <div className="rounded-lg border border-white/10 bg-card p-4">
+          <div className="space-y-2 md:col-span-2">
+            <p className="text-sm font-medium">Weekly Workout Volume</p>
             <WorkoutVolumeChart data={volumeData} />
           </div>
         </div>
       </section>
 
+      <div className="h-px bg-white/8" />
+
       {/* Money */}
       <section className="space-y-6">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Money
-        </h2>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">TikTok Followers</p>
-          <div className="rounded-lg border border-white/10 bg-card p-4">
-            <SocialGrowthChart
-              data={followerData}
-              target={followerGoal?.targetValue ?? undefined}
-            />
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Money</p>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-8 md:grid-cols-2">
+          <div className="space-y-2">
+            <p className="text-sm font-medium">TikTok Followers</p>
+            <SocialGrowthChart data={followerData} target={followerGoal?.targetValue ?? undefined} />
           </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Monthly Income</p>
-          <div className="rounded-lg border border-white/10 bg-card p-4">
-            <IncomeChart
-              data={incomeData}
-              target={incomeGoal?.targetValue ?? undefined}
-            />
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Monthly Income</p>
+            <IncomeChart data={incomeData} target={incomeGoal?.targetValue ?? undefined} />
           </div>
         </div>
       </section>
