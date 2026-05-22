@@ -39,7 +39,12 @@ export default async function MoneyContentPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold">TikTok Growth</h2>
+        <div>
+          <h2 className="text-base font-semibold">TikTok Growth</h2>
+          <p className="text-xs text-muted-foreground">
+            An audience rarely pays directly — it&apos;s an asset that compounds into future clients and opportunities.
+          </p>
+        </div>
         <div className="rounded-lg border border-white/10 bg-card p-4">
           <SocialGrowthChart data={chartData} target={followerGoal?.targetValue ?? null} />
         </div>
@@ -55,7 +60,6 @@ export default async function MoneyContentPage() {
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Date</th>
-                  <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Platform</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Followers</th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Videos</th>
                 </tr>
@@ -69,9 +73,6 @@ export default async function MoneyContentPage() {
                         month: "short",
                         year: "numeric",
                       })}
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {m.platform.charAt(0) + m.platform.slice(1).toLowerCase()}
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {m.followerCount.toLocaleString()}

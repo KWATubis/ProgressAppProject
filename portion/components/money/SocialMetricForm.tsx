@@ -6,11 +6,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { formatISODate, toUtcMidnight } from "@/lib/utils/dates";
 
-const PLATFORMS = ["TIKTOK", "INSTAGRAM", "YOUTUBE", "X"];
+const PLATFORM = "TIKTOK";
 
-export function SocialMetricForm({ defaultPlatform = "TIKTOK" }: { defaultPlatform?: string }) {
+export function SocialMetricForm() {
   const router = useRouter();
-  const [platform, setPlatform] = useState(defaultPlatform);
   const [date, setDate] = useState(() => formatISODate(toUtcMidnight()));
   const [followers, setFollowers] = useState("");
   const [videos, setVideos] = useState("");
@@ -23,7 +22,7 @@ export function SocialMetricForm({ defaultPlatform = "TIKTOK" }: { defaultPlatfo
     }
     const payload = {
       date,
-      platform,
+      platform: PLATFORM,
       followerCount: Number(followers),
       videoCount: videos === "" ? null : Number(videos),
     };
@@ -50,21 +49,7 @@ export function SocialMetricForm({ defaultPlatform = "TIKTOK" }: { defaultPlatfo
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <label className="space-y-1">
-          <span className="text-xs text-muted-foreground">Platform</span>
-          <select
-            value={platform}
-            onChange={(e) => setPlatform(e.target.value)}
-            className="h-9 w-full rounded-md border bg-background px-2 text-sm outline-none focus:border-foreground"
-          >
-            {PLATFORMS.map((p) => (
-              <option key={p} value={p}>
-                {p.charAt(0) + p.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <label className="space-y-1">
           <span className="text-xs text-muted-foreground">Date</span>
           <input
