@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, Pillar, TaskFrequency } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
@@ -61,31 +61,193 @@ const PPUL_PLAN = [
   },
 ];
 
+async function seedGoal(
+  profileId: string,
+  data: {
+    pillar: Pillar;
+    title: string;
+    targetDate?: Date | null;
+    targetValue?: number | null;
+    currentValue?: number | null;
+    startValue?: number | null;
+    unit?: string | null;
+  }
+) {
+  const existing = await prisma.goal.findFirst({ where: { profileId, title: data.title } });
+  if (existing) {
+    console.log(`  (exists) Goal "${data.title}"`);
+    return existing;
+  }
+  const goal = await prisma.goal.create({ data: { profileId, ...data } });
+  console.log(`  ✓ Goal "${data.title}"`);
+  return goal;
+}
+
+async function seedTask(
+  profileId: string,
+  data: {
+    pillar: Pillar;
+    title: string;
+    frequency: TaskFrequency;
+    dayOfWeek?: number[];
+    goalId?: string | null;
+    description?: string | null;
+  }
+) {
+  const existing = await prisma.task.findFirst({ where: { profileId, title: data.title } });
+  if (existing) {
+    console.log(`  (exists) Task "${data.title}"`);
+    return existing;
+  }
+  const task = await prisma.task.create({ data: { profileId, dayOfWeek: [], ...data } });
+  console.log(`  ✓ Task "${data.title}"`);
+  return task;
+}
+
 async function main() {
   const profileId = process.env.SEED_USER_ID;
   if (!profileId) {
-    console.error("SEED_USER_ID not set in .env.local — skipping backfill");
-    return;
+    console.error("SEED_USER_ID not set in .env.local — aborting");
+    process.exit(1);
   }
 
-  console.log(`Seeding ActivityType + WorkoutPlan for profile ${profileId}…`);
+  console.log(`\nSeeding profile ${profileId}…\n`);
 
-  // Create Gym ActivityType (idempotent)
-  const gymActivity = await prisma.activityType.upsert({
-    where: { profileId_slug: { profileId, slug: "gym" } },
-    create: {
-      profileId,
-      name: "Gym",
-      slug: "gym",
-      icon: "🏋️",
-      kind: "STRENGTH",
-    },
+  // ── 1. Profile ──────────────────────────────────────────────────────────────
+  await prisma.profile.upsert({
+    where: { id: profileId },
     update: {},
+    create: { id: profileId, email: "jkondracki55@gmail.com", name: "Jędrek" },
+  });
+  console.log("✓ Profile\n");
+
+  // ── 2. Goals ─────────────────────────────────────────────────────────────────
+  console.log("Goals:");
+  const bodyGoal = await seedGoal(profileId, {
+    pillar: "HEALTH",
+    title: "Bodybuilding contest weight",
+    targetDate: new Date("2026-07-04"),
+    targetValue: 68,
+    currentValue: 73,
+    startValue: 73,
+    unit: "kg",
   });
 
+  await seedGoal(profileId, {
+    pillar: "HEALTH",
+    title: "Daily calorie intake",
+    targetValue: 2400,
+    unit: "kcal/day",
+  });
+
+  await seedGoal(profileId, {
+    pillar: "HEALTH",
+    title: "Daily protein target",
+    targetValue: 180,
+    unit: "g/day",
+  });
+
+  await seedGoal(profileId, {
+    pillar: "HEALTH",
+    title: "Handstand hold",
+    targetValue: 30,
+    currentValue: 7,
+    startValue: 7,
+    unit: "seconds",
+  });
+
+  await seedGoal(profileId, {
+    pillar: "HEALTH",
+    title: "Muscle-ups",
+    targetValue: 10,
+    currentValue: 6,
+    startValue: 6,
+    unit: "reps",
+  });
+
+  const tiktokGoal = await seedGoal(profileId, {
+    pillar: "MONEY",
+    title: "TikTok followers",
+    targetDate: new Date("2026-10-01"),
+    targetValue: 10000,
+    currentValue: 1168,
+    startValue: 1168,
+    unit: "followers",
+  });
+
+  const incomeGoal = await seedGoal(profileId, {
+    pillar: "MONEY",
+    title: "Monthly income",
+    targetValue: 10000,
+    currentValue: 0,
+    startValue: 0,
+    unit: "PLN/month",
+  });
+
+  // ── 3. Tasks ─────────────────────────────────────────────────────────────────
+  console.log("\nTasks:");
+
+  // Gym days
+  await seedTask(profileId, { pillar: "HEALTH", title: "Train Push", frequency: "WEEKLY", dayOfWeek: [1, 4], goalId: bodyGoal.id });
+  await seedTask(profileId, { pillar: "HEALTH", title: "Train Pull", frequency: "WEEKLY", dayOfWeek: [2, 5], goalId: bodyGoal.id });
+  await seedTask(profileId, { pillar: "HEALTH", title: "Train Upper", frequency: "WEEKLY", dayOfWeek: [3], goalId: bodyGoal.id });
+  await seedTask(profileId, { pillar: "HEALTH", title: "Train Lower", frequency: "WEEKLY", dayOfWeek: [6], goalId: bodyGoal.id });
+
+  // Running
+  await seedTask(profileId, { pillar: "HEALTH", title: "Sprint session", frequency: "WEEKLY", dayOfWeek: [3] });
+  await seedTask(profileId, { pillar: "HEALTH", title: "Long run", frequency: "WEEKLY", dayOfWeek: [0] });
+
+  // Daily health
+  await seedTask(profileId, { pillar: "HEALTH", title: "Log 4 meals (2,400 kcal · 180g protein)", frequency: "DAILY" });
+  await seedTask(profileId, { pillar: "HEALTH", title: "Log body weight", frequency: "DAILY", goalId: bodyGoal.id });
+
+  // Daily money
+  await seedTask(profileId, { pillar: "MONEY", title: "Ship 1 piece of content", frequency: "DAILY", goalId: tiktokGoal.id });
+  await seedTask(profileId, { pillar: "MONEY", title: "Deep work · 2h", frequency: "DAILY" });
+
+  // Weekly money
+  await seedTask(profileId, { pillar: "MONEY", title: "Update follower count", frequency: "WEEKLY", dayOfWeek: [0], goalId: tiktokGoal.id });
+  await seedTask(profileId, { pillar: "MONEY", title: "Log weekly income", frequency: "WEEKLY", dayOfWeek: [0], goalId: incomeGoal.id });
+  await seedTask(profileId, { pillar: "HEALTH", title: "Review goal progress", frequency: "WEEKLY", dayOfWeek: [0] });
+
+  // ── 4. Body metric ───────────────────────────────────────────────────────────
+  await prisma.bodyMetric.upsert({
+    where: { profileId_date: { profileId, date: new Date("2026-05-19") } },
+    update: {},
+    create: { profileId, date: new Date("2026-05-19"), weightKg: 73 },
+  });
+  console.log("\n✓ BodyMetric (73 kg · 2026-05-19)");
+
+  // ── 5. Social metric ─────────────────────────────────────────────────────────
+  await prisma.socialMetric.upsert({
+    where: { profileId_platform_date: { profileId, platform: "TIKTOK", date: new Date("2026-05-19") } },
+    update: {},
+    create: { profileId, platform: "TIKTOK", date: new Date("2026-05-19"), followerCount: 1168 },
+  });
+  console.log("✓ SocialMetric (TikTok 1168 · 2026-05-19)");
+
+  // ── 6. Onboarding session ────────────────────────────────────────────────────
+  await prisma.onboardingSession.upsert({
+    where: { profileId },
+    update: { isComplete: true },
+    create: {
+      profileId,
+      isComplete: true,
+      messages: [
+        { role: "assistant", content: "Seeded by developer — onboarding complete." },
+      ],
+    },
+  });
+  console.log("✓ OnboardingSession (isComplete: true)");
+
+  // ── 7. ActivityType + WorkoutPlan ────────────────────────────────────────────
+  const gymActivity = await prisma.activityType.upsert({
+    where: { profileId_slug: { profileId, slug: "gym" } },
+    create: { profileId, name: "Gym", slug: "gym", icon: "🏋️", kind: "STRENGTH" },
+    update: {},
+  });
   console.log(`✓ ActivityType "Gym" (${gymActivity.id})`);
 
-  // Create WorkoutPlan if not already linked
   const existingPlan = await prisma.workoutPlan.findUnique({
     where: { activityTypeId: gymActivity.id },
   });
@@ -100,28 +262,24 @@ async function main() {
           create: PPUL_PLAN.map((day) => ({
             label: day.label,
             sortOrder: day.sortOrder,
-            exercises: {
-              create: day.exercises,
-            },
+            exercises: { create: day.exercises },
           })),
         },
       },
     });
-    console.log(`✓ WorkoutPlan "PPUL Split" (${plan.id}) with 4 days`);
+    console.log(`✓ WorkoutPlan "PPUL Split" (${plan.id}) — 4 days`);
   } else {
-    console.log(`✓ WorkoutPlan already exists — skipping`);
+    console.log("✓ WorkoutPlan already exists — skipping");
   }
 
-  // Link existing WorkoutSessions that have no activityTypeId
-  const updated = await prisma.workoutSession.updateMany({
+  const linked = await prisma.workoutSession.updateMany({
     where: { profileId, activityTypeId: null },
     data: { activityTypeId: gymActivity.id },
   });
-
-  console.log(`✓ Linked ${updated.count} existing WorkoutSession(s) → Gym`);
+  console.log(`✓ Linked ${linked.count} orphaned WorkoutSession(s) → Gym`);
 
   await prisma.$disconnect();
-  console.log("Seed complete.");
+  console.log("\nSeed complete.");
 }
 
 main().catch((e) => {
