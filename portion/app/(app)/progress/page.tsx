@@ -159,7 +159,7 @@ export default async function ProgressPage({
   return (
     <div className="mx-auto max-w-5xl space-y-10">
       {/* Header */}
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
           <p className="text-sm text-muted-foreground">All your charts in one place.</p>

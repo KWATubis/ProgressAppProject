@@ -14,7 +14,7 @@ export function RangeSelector({ current }: { current: Range }) {
   const router = useRouter();
 
   return (
-    <div className="flex gap-1 rounded-lg border border-white/10 bg-card p-1">
+    <div className="inline-flex gap-1 self-start rounded-lg border border-white/10 bg-card p-1">
       {RANGES.map(({ value, label }) => (
         <button
           key={value}
