@@ -1,8 +1,18 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { Dumbbell, TrendingUp } from "lucide-react";
 import { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const subscribe = () => () => {};
+function useHasMounted(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false,
+  );
+}
 
 export type PillarGoal = {
   id: string;
@@ -63,6 +73,7 @@ export function DashboardPillarCard({ pillar, goals, totalTasks, completedTasks 
         );
 
   const ringColor = progressColor(avgPct);
+  const mounted = useHasMounted();
 
   return (
     <Card className="relative overflow-hidden border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.01] to-transparent shadow-[0_8px_30px_-12px_rgba(0,0,0,0.6)]">
@@ -78,22 +89,24 @@ export function DashboardPillarCard({ pillar, goals, totalTasks, completedTasks 
       <CardContent>
         <div className="flex items-start gap-5">
           <div className="relative h-28 w-28 shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadialBarChart
-                innerRadius="74%"
-                outerRadius="100%"
-                data={[{ name: "progress", value: avgPct, fill: ringColor }]}
-                startAngle={90}
-                endAngle={-270}
-              >
-                <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                <RadialBar
-                  dataKey="value"
-                  background={{ fill: "rgba(255,255,255,0.06)" }}
-                  cornerRadius={12}
-                />
-              </RadialBarChart>
-            </ResponsiveContainer>
+            {mounted && (
+              <ResponsiveContainer width="100%" height="100%">
+                <RadialBarChart
+                  innerRadius="74%"
+                  outerRadius="100%"
+                  data={[{ name: "progress", value: avgPct, fill: ringColor }]}
+                  startAngle={90}
+                  endAngle={-270}
+                >
+                  <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                  <RadialBar
+                    dataKey="value"
+                    background={{ fill: "rgba(255,255,255,0.06)" }}
+                    cornerRadius={12}
+                  />
+                </RadialBarChart>
+              </ResponsiveContainer>
+            )}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center leading-none">
               <span
                 className="text-xl font-semibold tabular-nums"

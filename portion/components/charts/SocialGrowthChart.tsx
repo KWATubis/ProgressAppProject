@@ -7,9 +7,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { ChartFrame } from "./ChartFrame";
 
 export type FollowerDataPoint = { date: string; followerCount: number };
 
@@ -38,7 +38,7 @@ export function SocialGrowthChart({
   });
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ChartFrame height={220}>
       <LineChart data={formatted} margin={{ top: 10, right: 12, left: -8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
         <XAxis
@@ -88,6 +88,6 @@ export function SocialGrowthChart({
           activeDot={{ r: 4, fill: "#818cf8", strokeWidth: 0 }}
         />
       </LineChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }

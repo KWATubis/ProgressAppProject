@@ -7,8 +7,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
+import { ChartFrame } from "./ChartFrame";
 
 export type CardioDataPoint = { date: string; distanceKm: number };
 
@@ -31,7 +31,7 @@ export function CardioProgressChart({ data }: { data: CardioDataPoint[] }) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ChartFrame height={220}>
       <LineChart data={formatted} margin={{ top: 10, right: 12, left: -24, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
         <XAxis
@@ -68,6 +68,6 @@ export function CardioProgressChart({ data }: { data: CardioDataPoint[] }) {
           activeDot={{ r: 5, fill: "#60a5fa", strokeWidth: 0 }}
         />
       </LineChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }

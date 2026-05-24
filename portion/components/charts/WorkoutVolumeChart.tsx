@@ -7,8 +7,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
+import { ChartFrame } from "./ChartFrame";
 
 export type VolumeWeek = { week: string; volumeKg: number };
 
@@ -31,7 +31,7 @@ export function WorkoutVolumeChart({ data }: { data: VolumeWeek[] }) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ChartFrame height={220}>
       <BarChart data={formatted} margin={{ top: 5, right: 12, left: -16, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
         <XAxis
@@ -60,6 +60,6 @@ export function WorkoutVolumeChart({ data }: { data: VolumeWeek[] }) {
         />
         <Bar dataKey="volumeKg" fill="#34d399" radius={[3, 3, 0, 0]} maxBarSize={44} />
       </BarChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }

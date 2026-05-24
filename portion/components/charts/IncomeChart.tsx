@@ -7,9 +7,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { ChartFrame } from "./ChartFrame";
 
 export type IncomeMonth = { month: string; amountPln: number };
 
@@ -38,7 +38,7 @@ export function IncomeChart({
   });
 
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <ChartFrame height={200}>
       <BarChart data={formatted} margin={{ top: 5, right: 12, left: -8, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
         <XAxis
@@ -80,6 +80,6 @@ export function IncomeChart({
         )}
         <Bar dataKey="amountPln" fill="#818cf8" radius={[3, 3, 0, 0]} maxBarSize={48} />
       </BarChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }

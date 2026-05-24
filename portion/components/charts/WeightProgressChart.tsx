@@ -7,9 +7,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { ChartFrame } from "./ChartFrame";
 
 export type WeightDataPoint = { date: string; weightKg: number };
 
@@ -34,7 +34,7 @@ export function WeightProgressChart({ data }: { data: WeightDataPoint[] }) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ChartFrame height={220}>
       <LineChart data={formatted} margin={{ top: 10, right: 12, left: -24, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
         <XAxis
@@ -81,6 +81,6 @@ export function WeightProgressChart({ data }: { data: WeightDataPoint[] }) {
           activeDot={{ r: 4, fill: "#34d399", strokeWidth: 0 }}
         />
       </LineChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }

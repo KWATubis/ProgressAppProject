@@ -1,16 +1,14 @@
 "use client";
 
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   Area,
   AreaChart,
 } from "recharts";
+import { ChartFrame } from "./ChartFrame";
 
 export type ProgressPoint = { date: string; score: number };
 
@@ -33,7 +31,7 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={180}>
+    <ChartFrame height={180}>
       <AreaChart data={formatted} margin={{ top: 8, right: 12, left: -28, bottom: 0 }}>
         <defs>
           <linearGradient id="progressGrad" x1="0" y1="0" x2="0" y2="1">
@@ -76,6 +74,6 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
           activeDot={{ r: 4, fill: "#fbbf24", strokeWidth: 0 }}
         />
       </AreaChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }

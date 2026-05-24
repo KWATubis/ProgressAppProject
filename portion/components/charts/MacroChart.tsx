@@ -7,9 +7,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+import { ChartFrame } from "./ChartFrame";
 
 export type MacroDay = {
   date: string;
@@ -40,7 +40,7 @@ export function MacroChart({ data }: { data: MacroDay[] }) {
   });
 
   return (
-    <ResponsiveContainer width="100%" height={180}>
+    <ChartFrame height={180}>
       <BarChart data={formatted} margin={{ top: 5, right: 12, left: -24, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
         <XAxis
@@ -79,6 +79,6 @@ export function MacroChart({ data }: { data: MacroDay[] }) {
         />
         <Bar dataKey="kcal" fill="#34d399" radius={[3, 3, 0, 0]} maxBarSize={44} />
       </BarChart>
-    </ResponsiveContainer>
+    </ChartFrame>
   );
 }
