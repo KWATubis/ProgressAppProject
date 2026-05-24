@@ -27,6 +27,7 @@ Then read whichever plan notes are relevant to the current task:
 | `06 - Seed Data.md` | Pre-populated data from Second Brain vault |
 | `07 - Deployment Config.md` | Env vars, Vercel + Supabase setup |
 | `08 - Verification.md` | End-to-end test steps per phase |
+| `11 - Pre-Launch Tech Debt.md` | Items to fix before app goes public (TOCTOU, transactions, log cleanup, multi-user) |
 
 Do not re-plan. Do not ask the user to re-explain the project. Execute the plan.
 

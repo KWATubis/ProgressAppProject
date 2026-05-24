@@ -59,6 +59,12 @@ export function GoalsManager({ initialGoals }: { initialGoals: GoalView[] }) {
   const healthGoals = initialGoals.filter((g) => g.pillar === "HEALTH");
   const moneyGoals = initialGoals.filter((g) => g.pillar === "MONEY");
 
+  const editorKey = editor
+    ? editor.mode === "edit"
+      ? `edit:${editor.goal.id}`
+      : `create:${editor.pillar}`
+    : "closed";
+
   return (
     <div className="space-y-8">
       <PillarSection
@@ -74,7 +80,17 @@ export function GoalsManager({ initialGoals }: { initialGoals: GoalView[] }) {
         onEdit={(g) => setEditor({ mode: "edit", goal: g })}
       />
 
-      <GoalEditor state={editor} onClose={() => setEditor(null)} />
+      <Dialog open={editor !== null} onOpenChange={(o) => !o && setEditor(null)}>
+        <DialogContent className="sm:max-w-md">
+          {editor && (
+            <GoalEditorForm
+              key={editorKey}
+              state={editor}
+              onClose={() => setEditor(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -211,19 +227,19 @@ function GoalRow({ goal, onEdit }: { goal: GoalView; onEdit: () => void }) {
   );
 }
 
-function GoalEditor({
+function GoalEditorForm({
   state,
   onClose,
 }: {
-  state: EditorState;
+  state: NonNullable<EditorState>;
   onClose: () => void;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const isEdit = state?.mode === "edit";
+  const isEdit = state.mode === "edit";
   const initial = isEdit ? state.goal : null;
-  const initialPillar = state?.mode === "create" ? state.pillar : initial?.pillar ?? "HEALTH";
+  const initialPillar = state.mode === "create" ? state.pillar : state.goal.pillar;
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -237,21 +253,6 @@ function GoalEditor({
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
-
-  // Reset form when opening a different goal / mode
-  const stateKey = state ? (isEdit ? `edit:${state.goal.id}` : `create:${state.pillar}`) : "closed";
-  const [lastKey, setLastKey] = useState(stateKey);
-  if (stateKey !== lastKey) {
-    setLastKey(stateKey);
-    setTitle(initial?.title ?? "");
-    setDescription(initial?.description ?? "");
-    setPillar(initialPillar);
-    setCurrentValue(initial?.currentValue != null ? String(initial.currentValue) : "");
-    setTargetValue(initial?.targetValue != null ? String(initial.targetValue) : "");
-    setUnit(initial?.unit ?? "");
-    setTargetDate(initial?.targetDate ?? "");
-    setIsActive(initial?.isActive ?? true);
-  }
 
   function submit() {
     if (!title.trim()) {
@@ -288,16 +289,15 @@ function GoalEditor({
   }
 
   return (
-    <Dialog open={state !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit goal" : "New goal"}</DialogTitle>
-          <DialogDescription>
-            Track progress toward a measurable target, or just set an intention.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <DialogHeader>
+        <DialogTitle>{isEdit ? "Edit goal" : "New goal"}</DialogTitle>
+        <DialogDescription>
+          Track progress toward a measurable target, or just set an intention.
+        </DialogDescription>
+      </DialogHeader>
 
-        <div className="space-y-4">
+      <div className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="goal-title">Title</Label>
             <Input
@@ -400,16 +400,15 @@ function GoalEditor({
           )}
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            <X className="h-4 w-4" />
-            Cancel
-          </Button>
-          <Button type="button" onClick={submit} disabled={pending}>
-            {pending ? "Saving…" : isEdit ? "Save changes" : "Add goal"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onClose}>
+          <X className="h-4 w-4" />
+          Cancel
+        </Button>
+        <Button type="button" onClick={submit} disabled={pending}>
+          {pending ? "Saving…" : isEdit ? "Save changes" : "Add goal"}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }

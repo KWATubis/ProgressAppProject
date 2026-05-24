@@ -62,7 +62,7 @@ export default async function ProgressPage({
         orderBy: { date: "asc" },
       }),
       prisma.socialMetric.findMany({
-        where: { profileId: user.id, platform: "TikTok", date: dateFilter },
+        where: { profileId: user.id, platform: "TIKTOK", date: dateFilter },
         orderBy: { date: "asc" },
       }),
       prisma.incomeEntry.findMany({
