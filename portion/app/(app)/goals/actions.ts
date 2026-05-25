@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { findMetric } from "@/lib/goalMetrics";
+import { computeMetricValue } from "@/lib/goalMetrics.server";
 
 const upsertSchema = z.object({
   id: z.string().optional(),
@@ -15,6 +17,7 @@ const upsertSchema = z.object({
   unit: z.string().nullable().optional(),
   targetDate: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
+  metricKey: z.string().nullable().optional(),
 });
 
 export type UpsertGoalInput = z.infer<typeof upsertSchema>;
@@ -48,6 +51,23 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
   }
   const data = parsed.data;
 
+  // Validate metricKey against the known list. If a metric is linked, the
+  // current value comes from the user's logged data — ignore whatever the
+  // client sent for currentValue/unit and use the metric's canonical unit.
+  let metricKey: string | null = null;
+  let resolvedCurrent = data.currentValue ?? null;
+  let resolvedUnit: string | null = data.unit?.trim() ? data.unit : null;
+  if (data.metricKey) {
+    const metric = findMetric(data.metricKey);
+    if (!metric) return { error: "Unknown metric." };
+    if (metric.pillar !== data.pillar) {
+      return { error: `That metric belongs to the ${metric.pillar.toLowerCase()} pillar.` };
+    }
+    metricKey = metric.key;
+    resolvedCurrent = await computeMetricValue(user.id, metric.key);
+    resolvedUnit = metric.unit;
+  }
+
   try {
     if (data.id) {
       // For updates, only recompute startValue when current/target change in a way
@@ -58,9 +78,13 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
       });
       if (!existing) return { error: "Goal not found." };
 
-      const start =
-        existing.startValue ??
-        deriveStartValue(data.currentValue ?? null, data.targetValue ?? null);
+      // If the metric link changed, reset the baseline so progress is
+      // measured from the new starting point.
+      const metricChanged = (existing.metricKey ?? null) !== metricKey;
+      const start = metricChanged
+        ? deriveStartValue(resolvedCurrent, data.targetValue ?? null)
+        : existing.startValue ??
+          deriveStartValue(resolvedCurrent, data.targetValue ?? null);
 
       await prisma.goal.update({
         where: { id: data.id },
@@ -68,10 +92,11 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
           pillar: data.pillar,
           title: data.title,
           description: data.description ?? null,
-          currentValue: data.currentValue ?? null,
+          currentValue: resolvedCurrent,
           targetValue: data.targetValue ?? null,
           startValue: start,
-          unit: data.unit?.trim() ? data.unit : null,
+          unit: resolvedUnit,
+          metricKey,
           targetDate: data.targetDate ? new Date(data.targetDate) : null,
           isActive: data.isActive ?? true,
         },
@@ -83,10 +108,11 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
           pillar: data.pillar,
           title: data.title,
           description: data.description ?? null,
-          currentValue: data.currentValue ?? null,
+          currentValue: resolvedCurrent,
           targetValue: data.targetValue ?? null,
-          startValue: deriveStartValue(data.currentValue ?? null, data.targetValue ?? null),
-          unit: data.unit?.trim() ? data.unit : null,
+          startValue: deriveStartValue(resolvedCurrent, data.targetValue ?? null),
+          unit: resolvedUnit,
+          metricKey,
           targetDate: data.targetDate ? new Date(data.targetDate) : null,
           isActive: data.isActive ?? true,
         },

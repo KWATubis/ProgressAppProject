@@ -92,6 +92,7 @@ model Goal {
   currentValue Float?
   startValue   Float?
   unit         String?
+  metricKey    String?
   isActive     Boolean   @default(true)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

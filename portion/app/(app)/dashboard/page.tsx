@@ -6,6 +6,7 @@ import { isTaskScheduledOn } from "@/lib/utils/tasks";
 import { DashboardPillarCard, type PillarGoal } from "@/components/dashboard/DashboardPillarCard";
 import { TodayTaskList, type TodayTask } from "@/components/dashboard/TodayTaskList";
 import { QuickStats } from "@/components/dashboard/QuickStats";
+import { withDerivedCurrent } from "@/lib/goalMetrics.server";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
   const today = toUtcMidnight();
   const todayISO = formatISODate(today);
 
-  const [profile, goals, tasks, logsToday, latestWeight, dietToday, latestSocial] = await Promise.all([
+  const [profile, rawGoals, tasks, logsToday, latestWeight, dietToday, latestSocial] = await Promise.all([
     prisma.profile.findUnique({ where: { id: user.id }, select: { name: true, email: true } }),
     prisma.goal.findMany({
       where: { profileId: user.id, isActive: true },
@@ -38,6 +39,8 @@ export default async function DashboardPage() {
       orderBy: { date: "desc" },
     }),
   ]);
+
+  const goals = await withDerivedCurrent(rawGoals);
 
   const todayTasks = tasks.filter((t) => isTaskScheduledOn(t, today));
   const logByTaskId = new Map(logsToday.map((l) => [l.taskId, l.status]));

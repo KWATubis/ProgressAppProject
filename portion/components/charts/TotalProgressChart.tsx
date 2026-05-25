@@ -47,10 +47,12 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
           axisLine={false}
         />
         <YAxis
+          domain={[0, 90]}
+          ticks={[0, 15, 30, 45, 60, 75, 90]}
           tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
           tickLine={false}
           axisLine={false}
-          allowDecimals={false}
+          allowDataOverflow
         />
         <Tooltip
           contentStyle={{
@@ -60,7 +62,7 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
             fontSize: 12,
           }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(v: any) => [`${v} perfect days`, "Progress"]}
+          formatter={(v: any) => [Number(v).toFixed(2), "Score"]}
           labelStyle={{ color: "rgba(255,255,255,0.4)", marginBottom: 2 }}
           cursor={{ stroke: "rgba(255,255,255,0.08)" }}
         />

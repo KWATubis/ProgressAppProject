@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate, addDays } from "@/lib/utils/dates";
+import { isTaskScheduledOn } from "@/lib/utils/tasks";
 import { WeightProgressChart, type WeightDataPoint } from "@/components/charts/WeightProgressChart";
 import { MacroChart, type MacroDay } from "@/components/charts/MacroChart";
 import { WorkoutVolumeChart, type VolumeWeek } from "@/components/charts/WorkoutVolumeChart";
@@ -46,7 +47,7 @@ export default async function ProgressPage({
   const since = days != null ? addDays(today, -days) : undefined;
   const dateFilter = since ? { gte: since } : undefined;
 
-  const [weightMetrics, dietLogs, workoutSessions, socialMetrics, incomeEntries, goals, allTaskLogs] =
+  const [weightMetrics, dietLogs, workoutSessions, socialMetrics, incomeEntries, goals, allTaskLogs, allTasks, profile] =
     await Promise.all([
       prisma.bodyMetric.findMany({
         where: { profileId: user.id, date: dateFilter, weightKg: { not: null } },
@@ -74,27 +75,80 @@ export default async function ProgressPage({
       prisma.taskLog.findMany({
         where: { profileId: user.id },
         orderBy: { date: "asc" },
-        select: { date: true, status: true },
+        select: { date: true, taskId: true, status: true },
       }),
+      prisma.task.findMany({
+        where: { profileId: user.id },
+        select: {
+          id: true,
+          frequency: true,
+          dayOfWeek: true,
+          scheduledAt: true,
+          isActive: true,
+          createdAt: true,
+        },
+      }),
+      prisma.profile.findUnique({ where: { id: user.id }, select: { createdAt: true } }),
     ]);
 
-  // --- Total progress (cumulative perfect days, all-time) ---
-  const logsByDate = new Map<string, { hasComplete: boolean; hasPending: boolean }>();
+  // --- Total progress (exponential growth score, every day from start) ---
+  // Build a per-day map of task statuses.
+  const logsByDate = new Map<string, Map<string, "PENDING" | "COMPLETE" | "SKIPPED">>();
   for (const log of allTaskLogs) {
     const key = formatISODate(log.date);
-    const prev = logsByDate.get(key) ?? { hasComplete: false, hasPending: false };
-    logsByDate.set(key, {
-      hasComplete: prev.hasComplete || log.status === "COMPLETE",
-      hasPending: prev.hasPending || log.status === "PENDING",
-    });
+    let inner = logsByDate.get(key);
+    if (!inner) {
+      inner = new Map();
+      logsByDate.set(key, inner);
+    }
+    inner.set(log.taskId, log.status);
   }
-  let running = 0;
-  const progressData: ProgressPoint[] = Array.from(logsByDate.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, { hasComplete, hasPending }]) => {
-      if (hasComplete && !hasPending) running++;
-      return { date, score: running };
-    });
+
+  // Determine the start day: earliest of (first log date, profile creation, first task creation).
+  const candidates: Date[] = [];
+  if (allTaskLogs[0]) candidates.push(toUtcMidnight(allTaskLogs[0].date));
+  for (const t of allTasks) candidates.push(toUtcMidnight(t.createdAt));
+  if (profile?.createdAt) candidates.push(toUtcMidnight(profile.createdAt));
+  let startDay = candidates.length > 0 ? new Date(Math.min(...candidates.map((d) => d.getTime()))) : today;
+  // Don't run further back than 365 days — keeps the chart readable.
+  const earliestAllowed = addDays(today, -365);
+  if (startDay < earliestAllowed) startDay = earliestAllowed;
+
+  const progressData: ProgressPoint[] = [];
+  let score = 1;
+  for (let d = new Date(startDay); d <= today; d = addDays(d, 1)) {
+    const iso = formatISODate(d);
+    // Count tasks that were scheduled for this day (active OR archived but
+    // historically scheduled doesn't track soft-delete history, so we use the
+    // current schedule against d, ignoring isActive when d is in the past).
+    const scheduledTaskIds = allTasks
+      .filter((t) => isTaskScheduledOn({ ...t, isActive: true }, d) && toUtcMidnight(t.createdAt) <= d)
+      .map((t) => t.id);
+
+    const statuses = logsByDate.get(iso);
+    if (scheduledTaskIds.length === 0) {
+      // No tasks scheduled — neutral day, score unchanged.
+      progressData.push({ date: iso, score: Number(score.toFixed(4)) });
+      continue;
+    }
+
+    let missed = 0;
+    for (const id of scheduledTaskIds) {
+      const s = statuses?.get(id);
+      if (s !== "COMPLETE") missed++;
+    }
+
+    let multiplier = 1;
+    if (missed === 0) multiplier = 1.01; // perfect day → +1%
+    else if (missed === 1) multiplier = 1.0; // missed 1 → flat
+    else if (missed === 2) multiplier = 0.995; // missed 2 → -0.5%
+    else multiplier = 0.99; // missed 3+ → -1%
+
+    score = score * multiplier;
+    progressData.push({ date: iso, score: Number(score.toFixed(4)) });
+  }
+
+  const currentScore = progressData.length > 0 ? progressData[progressData.length - 1].score : 1;
 
   // --- Weight ---
   const weightData: WeightDataPoint[] = weightMetrics.map((m) => ({
@@ -172,7 +226,8 @@ export default async function ProgressPage({
         <div>
           <p className="text-sm font-semibold">Total Progress</p>
           <p className="text-xs text-muted-foreground">
-            Cumulative days where every task was completed — {running} so far.
+            Compound habit score — perfect days grow it 1%, two misses shave 0.5%,
+            three or more shave 1%. Currently <span className="tabular-nums text-foreground">{currentScore.toFixed(2)}</span>.
           </p>
         </div>
         <TotalProgressChart data={progressData} />

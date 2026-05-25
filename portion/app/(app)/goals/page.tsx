@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { GoalsManager, type GoalView } from "@/components/goals/GoalsManager";
+import { withDerivedCurrent } from "@/lib/goalMetrics.server";
 
 export default async function GoalsPage() {
   const supabase = await createClient();
@@ -14,8 +15,9 @@ export default async function GoalsPage() {
     where: { profileId: user.id },
     orderBy: [{ pillar: "asc" }, { isActive: "desc" }, { createdAt: "asc" }],
   });
+  const refreshed = await withDerivedCurrent(goals);
 
-  const views: GoalView[] = goals.map((g) => ({
+  const views: GoalView[] = refreshed.map((g) => ({
     id: g.id,
     pillar: g.pillar,
     title: g.title,
@@ -26,6 +28,7 @@ export default async function GoalsPage() {
     unit: g.unit,
     targetDate: g.targetDate ? g.targetDate.toISOString().slice(0, 10) : null,
     isActive: g.isActive,
+    metricKey: g.metricKey,
   }));
 
   return (

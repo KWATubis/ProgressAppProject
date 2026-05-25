@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { upsertGoal, deleteGoal } from "@/app/(app)/goals/actions";
+import { GOAL_METRICS, findMetric } from "@/lib/goalMetrics";
 
 export type Pillar = "HEALTH" | "MONEY";
 
@@ -32,6 +33,7 @@ export type GoalView = {
   unit: string | null;
   targetDate: string | null;
   isActive: boolean;
+  metricKey: string | null;
 };
 
 type EditorState =
@@ -176,6 +178,11 @@ function GoalRow({ goal, onEdit }: { goal: GoalView; onEdit: () => void }) {
           {goal.description && (
             <p className="text-xs text-muted-foreground">{goal.description}</p>
           )}
+          {goal.metricKey && (
+            <p className="text-[10px] text-emerald-400/80">
+              Auto-tracked · {findMetric(goal.metricKey)?.label ?? goal.metricKey}
+            </p>
+          )}
           {pct !== null && (
             <div className="pt-1">
               <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
@@ -244,6 +251,7 @@ function GoalEditorForm({
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [pillar, setPillar] = useState<Pillar>(initialPillar);
+  const [metricKey, setMetricKey] = useState<string>(initial?.metricKey ?? "");
   const [currentValue, setCurrentValue] = useState(
     initial?.currentValue != null ? String(initial.currentValue) : "",
   );
@@ -253,6 +261,21 @@ function GoalEditorForm({
   const [unit, setUnit] = useState(initial?.unit ?? "");
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+
+  const metric = findMetric(metricKey);
+  const pillarMetrics = GOAL_METRICS.filter((m) => m.pillar === pillar);
+
+  // If user switches pillar, clear an incompatible metric pick.
+  function changePillar(p: Pillar) {
+    setPillar(p);
+    if (metric && metric.pillar !== p) setMetricKey("");
+  }
+
+  function changeMetric(key: string) {
+    setMetricKey(key);
+    const m = findMetric(key);
+    if (m) setUnit(m.unit);
+  }
 
   function submit() {
     if (!title.trim()) {
@@ -277,6 +300,7 @@ function GoalEditorForm({
         unit: unit.trim() || null,
         targetDate: targetDate || null,
         isActive,
+        metricKey: metricKey || null,
       });
       if ("error" in res) {
         toast.error(res.error);
@@ -316,7 +340,7 @@ function GoalEditorForm({
                 <button
                   key={p}
                   type="button"
-                  onClick={() => setPillar(p)}
+                  onClick={() => changePillar(p)}
                   className={cn(
                     "flex-1 rounded-md border px-3 py-2 text-sm font-medium transition",
                     pillar === p
@@ -328,6 +352,28 @@ function GoalEditorForm({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="goal-metric">Track</Label>
+            <select
+              id="goal-metric"
+              value={metricKey}
+              onChange={(e) => changeMetric(e.target.value)}
+              className="flex h-9 w-full rounded-md border bg-background px-2 text-sm outline-none focus:border-foreground"
+            >
+              <option value="">Custom — I&apos;ll update progress manually</option>
+              {pillarMetrics.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label} ({m.unit})
+                </option>
+              ))}
+            </select>
+            <p className="text-[11px] text-muted-foreground">
+              {metric
+                ? `Progress updates automatically from your ${metric.hint?.toLowerCase() ?? metric.label.toLowerCase()}.`
+                : "You'll type in the current value yourself."}
+            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -350,7 +396,8 @@ function GoalEditorForm({
                 inputMode="decimal"
                 value={currentValue}
                 onChange={(e) => setCurrentValue(e.target.value)}
-                placeholder="—"
+                placeholder={metric ? "Auto" : "—"}
+                disabled={!!metric}
               />
             </div>
             <div className="space-y-1.5">
@@ -374,6 +421,7 @@ function GoalEditorForm({
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 placeholder="kg, followers, zł…"
+                disabled={!!metric}
               />
             </div>
             <div className="space-y-1.5">
