@@ -61,6 +61,7 @@ model Profile {
   goals             Goal[]
   tasks             Task[]
   taskLogs          TaskLog[]
+  taskDayOrders     TaskDayOrder[]
   workoutSessions   WorkoutSession[]
   dietLogs          DietLog[]
   bodyMetrics       BodyMetric[]
@@ -100,23 +101,38 @@ model Goal {
 }
 
 model Task {
-  id            String        @id @default(cuid())
+  id            String         @id @default(cuid())
   profileId     String
-  profile       Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile       Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
   goalId        String?
-  goal          Goal?         @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  goal          Goal?          @relation(fields: [goalId], references: [id], onDelete: SetNull)
   pillar        Pillar
   title         String
   description   String?
   frequency     TaskFrequency
   scheduledAt   DateTime?
   dayOfWeek     Int[]
-  isAiGenerated Boolean       @default(false)
-  isActive      Boolean       @default(true)
-  sortOrder     Int           @default(0)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  durationMin   Int?
+  isAiGenerated Boolean        @default(false)
+  isActive      Boolean        @default(true)
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   taskLogs      TaskLog[]
+  dayOrders     TaskDayOrder[]
+}
+
+model TaskDayOrder {
+  id        String   @id @default(cuid())
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  date      DateTime
+  sortOrder Int
+
+  @@unique([taskId, date])
+  @@index([profileId, date])
 }
 
 model TaskLog {

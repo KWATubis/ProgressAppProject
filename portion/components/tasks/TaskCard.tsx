@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Dumbbell, GripVertical, TrendingUp } from "lucide-react";
+import { Check, Clock, Dumbbell, GripVertical, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type CalendarTask = {
@@ -9,6 +9,7 @@ export type CalendarTask = {
   pillar: "HEALTH" | "MONEY";
   frequency: "DAILY" | "WEEKLY" | "ONE_TIME";
   status: "PENDING" | "COMPLETE" | "SKIPPED";
+  durationMin: number | null;
 };
 
 const FREQ_LABEL: Record<CalendarTask["frequency"], string> = {
@@ -17,19 +18,34 @@ const FREQ_LABEL: Record<CalendarTask["frequency"], string> = {
   ONE_TIME: "Once",
 };
 
+export function formatDuration(min: number): string {
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
 export function TaskCard({
   task,
   onToggle,
   onDragStart,
   onDragEnd,
+  onDragOver,
+  onDragLeave,
+  onDrop,
   isDragging,
+  isReorderTarget,
   draggable = true,
 }: {
   task: CalendarTask;
   onToggle: () => void;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragLeave?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDrop?: (e: React.DragEvent<HTMLDivElement>) => void;
   isDragging?: boolean;
+  isReorderTarget?: boolean;
   draggable?: boolean;
 }) {
   const done = task.status === "COMPLETE";
@@ -44,11 +60,15 @@ export function TaskCard({
       draggable={draggable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
       className={cn(
-        "group flex w-full items-start gap-1.5 rounded-md border px-1.5 py-1.5 text-left text-xs transition hover:shadow-sm",
+        "group relative flex w-full items-start gap-1.5 rounded-md border px-1.5 py-1.5 text-left text-xs transition hover:shadow-sm",
         accent,
         done && "opacity-60",
         isDragging && "opacity-30",
+        isReorderTarget && "before:absolute before:-top-1 before:left-0 before:right-0 before:h-0.5 before:rounded-full before:bg-foreground/70",
         draggable && "cursor-grab active:cursor-grabbing",
       )}
     >
@@ -76,9 +96,18 @@ export function TaskCard({
         <span className={cn("block truncate font-medium", done && "line-through")}>
           {task.title}
         </span>
-        <span className="mt-0.5 flex items-center gap-1 text-[10px] uppercase tracking-wider opacity-70">
+        <span className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider opacity-70">
           <Icon className="h-2.5 w-2.5" />
           {FREQ_LABEL[task.frequency]}
+          {task.durationMin != null && (
+            <>
+              <span aria-hidden>·</span>
+              <Clock className="h-2.5 w-2.5" />
+              <span className="normal-case tracking-normal">
+                {formatDuration(task.durationMin)}
+              </span>
+            </>
+          )}
         </span>
       </button>
     </div>

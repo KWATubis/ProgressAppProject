@@ -12,6 +12,7 @@ const createSchema = z.object({
   scheduledAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   description: z.string().max(500).optional().nullable(),
   goalId: z.string().optional().nullable(),
+  durationMin: z.number().int().min(1).max(24 * 60).optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -53,6 +54,7 @@ export async function POST(req: Request) {
         body.frequency === "ONE_TIME" && body.scheduledAt
           ? parseISODate(body.scheduledAt)
           : null,
+      durationMin: body.durationMin ?? null,
       goalId: body.goalId ?? null,
       isAiGenerated: false,
     },

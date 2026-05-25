@@ -34,7 +34,7 @@ export default async function TasksPage({
   const weekStart = week[0];
   const weekEnd = week[6];
 
-  const [tasks, logs] = await Promise.all([
+  const [tasks, logs, dayOrders] = await Promise.all([
     prisma.task.findMany({
       where: { profileId: user.id, isActive: true },
       orderBy: [{ pillar: "asc" }, { sortOrder: "asc" }],
@@ -45,10 +45,25 @@ export default async function TasksPage({
         date: { gte: weekStart, lte: weekEnd },
       },
     }),
+    prisma.taskDayOrder.findMany({
+      where: {
+        profileId: user.id,
+        date: { gte: weekStart, lte: weekEnd },
+      },
+      select: { taskId: true, date: true, sortOrder: true },
+    }),
   ]);
 
   const logKey = (taskId: string, d: Date) => `${taskId}::${formatISODate(d)}`;
   const logIndex = new Map(logs.map((l) => [logKey(l.taskId, l.date), l.status]));
+  // Per-day override of task position. Missing entries fall back to the
+  // task's global sortOrder so a task that's never been reordered keeps a
+  // stable spot.
+  const dayOrderIndex = new Map(
+    dayOrders.map((o) => [logKey(o.taskId, o.date), o.sortOrder]),
+  );
+
+  const taskSortOrder = new Map(tasks.map((t) => [t.id, t.sortOrder]));
 
   const days: WeekDay[] = week.map((d) => {
     const dayTasks: CalendarTask[] = tasks
@@ -59,10 +74,18 @@ export default async function TasksPage({
         pillar: t.pillar,
         frequency: t.frequency,
         status: logIndex.get(logKey(t.id, d)) ?? "PENDING",
+        durationMin: t.durationMin,
       }))
       // SKIPPED tasks are hidden for that specific day. The recurring task
       // itself stays untouched and shows on its other scheduled days.
-      .filter((t) => t.status !== "SKIPPED");
+      .filter((t) => t.status !== "SKIPPED")
+      .sort((a, b) => {
+        const ao =
+          dayOrderIndex.get(logKey(a.id, d)) ?? taskSortOrder.get(a.id) ?? 0;
+        const bo =
+          dayOrderIndex.get(logKey(b.id, d)) ?? taskSortOrder.get(b.id) ?? 0;
+        return ao - bo;
+      });
     return {
       iso: formatISODate(d),
       label: DAY_LABELS[d.getUTCDay()],

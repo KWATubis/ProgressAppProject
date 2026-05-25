@@ -33,6 +33,7 @@ export function AddTaskDialog() {
   const [frequency, setFrequency] = useState<Frequency>("DAILY");
   const [dayOfWeek, setDayOfWeek] = useState<number[]>([]);
   const [scheduledAt, setScheduledAt] = useState<string>("");
+  const [durationMin, setDurationMin] = useState<string>("");
 
   function reset() {
     setTitle("");
@@ -40,6 +41,7 @@ export function AddTaskDialog() {
     setFrequency("DAILY");
     setDayOfWeek([]);
     setScheduledAt("");
+    setDurationMin("");
   }
 
   function submit() {
@@ -67,6 +69,7 @@ export function AddTaskDialog() {
             frequency,
             dayOfWeek: frequency === "WEEKLY" ? dayOfWeek : [],
             scheduledAt: frequency === "ONE_TIME" ? scheduledAt : null,
+            durationMin: durationMin.trim() ? Number(durationMin) : null,
           }),
         });
         if (!res.ok) throw new Error(await res.text());
@@ -195,6 +198,20 @@ export function AddTaskDialog() {
               />
             </div>
           )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="task-duration">Duration (min)</Label>
+            <Input
+              id="task-duration"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={5}
+              value={durationMin}
+              onChange={(e) => setDurationMin(e.target.value)}
+              placeholder="optional, e.g. 30"
+            />
+          </div>
         </div>
 
         <DialogFooter>

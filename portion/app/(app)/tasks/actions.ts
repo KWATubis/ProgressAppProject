@@ -124,6 +124,63 @@ export async function skipTaskForDate(
   return { ok: true };
 }
 
+const reorderSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  orderedTaskIds: z.array(z.string().min(1)).min(1),
+});
+
+export async function reorderTasksForDate(
+  input: z.infer<typeof reorderSchema>,
+): Promise<ActionResult> {
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return { error: "Not authenticated." };
+  }
+
+  const parsed = reorderSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { date, orderedTaskIds } = parsed.data;
+
+  // Confirm every task in the requested ordering belongs to this user.
+  // Anything missing means a stale client or a tampered payload.
+  const owned = await prisma.task.findMany({
+    where: { id: { in: orderedTaskIds }, profileId: user.id },
+    select: { id: true },
+  });
+  if (owned.length !== orderedTaskIds.length) {
+    return { error: "Some tasks not found." };
+  }
+
+  const dateMidnight = parseISODate(date);
+
+  try {
+    await prisma.$transaction(
+      orderedTaskIds.map((taskId, idx) =>
+        prisma.taskDayOrder.upsert({
+          where: { taskId_date: { taskId, date: dateMidnight } },
+          create: {
+            profileId: user.id,
+            taskId,
+            date: dateMidnight,
+            sortOrder: idx,
+          },
+          update: { sortOrder: idx },
+        }),
+      ),
+    );
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to reorder." };
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 export async function deleteTask(taskId: string): Promise<ActionResult> {
   let user;
   try {

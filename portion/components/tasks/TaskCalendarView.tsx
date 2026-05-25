@@ -4,9 +4,14 @@ import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { TaskCard, type CalendarTask } from "./TaskCard";
+import { TaskCard, formatDuration, type CalendarTask } from "./TaskCard";
 import { cn } from "@/lib/utils";
-import { moveTask, deleteTask, skipTaskForDate } from "@/app/(app)/tasks/actions";
+import {
+  moveTask,
+  deleteTask,
+  skipTaskForDate,
+  reorderTasksForDate,
+} from "@/app/(app)/tasks/actions";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +41,8 @@ type DragPayload = {
 type OptimisticOp =
   | { kind: "delete"; taskId: string }
   | { kind: "skip"; taskId: string; iso: string }
-  | { kind: "move"; taskId: string; fromIso: string; toIso: string };
+  | { kind: "move"; taskId: string; fromIso: string; toIso: string }
+  | { kind: "reorder"; taskId: string; iso: string; beforeTaskId: string | null };
 
 type ConfirmDelete = {
   taskId: string;
@@ -59,6 +65,20 @@ function applyOptimisticOp(state: WeekDay[], op: OptimisticOp): WeekDay[] {
     return state.map((d) =>
       d.iso !== op.iso ? d : { ...d, tasks: d.tasks.filter((t) => t.id !== op.taskId) },
     );
+  }
+  if (op.kind === "reorder") {
+    return state.map((d) => {
+      if (d.iso !== op.iso) return d;
+      const fromIdx = d.tasks.findIndex((t) => t.id === op.taskId);
+      if (fromIdx < 0) return d;
+      const without = d.tasks.filter((_, i) => i !== fromIdx);
+      const insertAt = op.beforeTaskId
+        ? without.findIndex((t) => t.id === op.beforeTaskId)
+        : without.length;
+      const tasks = [...without];
+      tasks.splice(insertAt < 0 ? tasks.length : insertAt, 0, d.tasks[fromIdx]);
+      return { ...d, tasks };
+    });
   }
   // move: pluck the task off the source day, attach to the target day.
   let plucked: CalendarTask | undefined;
@@ -96,6 +116,7 @@ export function TaskCalendarView({
   const [statusOverrides, setStatusOverrides] = useState<Record<string, CalendarTask["status"]>>({});
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [dropHover, setDropHover] = useState<string | null>(null); // ISO of day being hovered or "trash"
+  const [reorderHover, setReorderHover] = useState<string | null>(null); // taskId being hovered as reorder target
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete | null>(null);
   const [optimisticDays, applyOp] = useOptimistic(days, applyOptimisticOp);
 
@@ -162,6 +183,66 @@ export function TaskCalendarView({
   function handleDayDragLeave(e: React.DragEvent<HTMLDivElement>, day: WeekDay) {
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setDropHover((h) => (h === day.iso ? null : h));
+  }
+
+  function handleCardDragOver(
+    e: React.DragEvent<HTMLDivElement>,
+    day: WeekDay,
+    card: CalendarTask,
+  ) {
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+    if (drag?.fromIso !== day.iso) return; // cross-day drag → let day column handle
+    if (drag?.taskId === card.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
+    setReorderHover(card.id);
+  }
+
+  function handleCardDragLeave(
+    e: React.DragEvent<HTMLDivElement>,
+    card: CalendarTask,
+  ) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setReorderHover((h) => (h === card.id ? null : h));
+  }
+
+  function handleCardDrop(
+    e: React.DragEvent<HTMLDivElement>,
+    day: WeekDay,
+    card: CalendarTask,
+  ) {
+    const payload = parseDragPayload(e);
+    if (!payload || payload.fromIso !== day.iso || payload.taskId === card.id) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setReorderHover(null);
+    setDrag(null);
+
+    // Compute the new ordered list from what the user actually sees so the
+    // server's stored order matches the optimistic UI.
+    const visibleDay = optimisticDays.find((d) => d.iso === day.iso);
+    if (!visibleDay) return;
+    const fromIdx = visibleDay.tasks.findIndex((t) => t.id === payload.taskId);
+    if (fromIdx < 0) return;
+    const moved = visibleDay.tasks[fromIdx];
+    const without = visibleDay.tasks.filter((_, i) => i !== fromIdx);
+    const beforeIdx = without.findIndex((t) => t.id === card.id);
+    const newOrder = [...without];
+    newOrder.splice(beforeIdx < 0 ? newOrder.length : beforeIdx, 0, moved);
+
+    startTransition(async () => {
+      applyOp({ kind: "reorder", taskId: payload.taskId, iso: day.iso, beforeTaskId: card.id });
+      const res = await reorderTasksForDate({
+        date: day.iso,
+        orderedTaskIds: newOrder.map((t) => t.id),
+      });
+      if ("error" in res) {
+        toast.error(res.error);
+      } else {
+        router.refresh();
+      }
+    });
   }
 
   function parseDragPayload(e: React.DragEvent): DragPayload | null {
@@ -275,7 +356,7 @@ export function TaskCalendarView({
         <div>
           <h2 className="text-sm font-semibold">{weekLabel}</h2>
           <p className="text-xs text-muted-foreground">
-            Click a task to toggle it. Drag to move it to another day, or drop on the trash to delete.
+            Click to toggle. Drag onto another day to move it, onto another task in the same day to reorder, or drop on the trash to delete.
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -351,12 +432,28 @@ export function TaskCalendarView({
                         onToggle={() => toggle(day.iso, t)}
                         onDragStart={(e) => handleDragStart(e, t, day)}
                         onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleCardDragOver(e, day, t)}
+                        onDragLeave={(e) => handleCardDragLeave(e, t)}
+                        onDrop={(e) => handleCardDrop(e, day, t)}
                         isDragging={beingDragged}
+                        isReorderTarget={reorderHover === t.id}
                       />
                     );
                   })
                 )}
               </div>
+              {(() => {
+                const total = day.tasks.reduce(
+                  (sum, t) => sum + (t.durationMin ?? 0),
+                  0,
+                );
+                if (total === 0) return null;
+                return (
+                  <div className="mt-2 border-t border-foreground/5 px-1 pt-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
+                    Total {formatDuration(total)}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}
