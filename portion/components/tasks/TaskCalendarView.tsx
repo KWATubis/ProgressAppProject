@@ -6,7 +6,16 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { TaskCard, type CalendarTask } from "./TaskCard";
 import { cn } from "@/lib/utils";
-import { moveTask, deleteTask } from "@/app/(app)/tasks/actions";
+import { moveTask, deleteTask, skipTaskForDate } from "@/app/(app)/tasks/actions";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export type WeekDay = {
   iso: string; // YYYY-MM-DD
@@ -26,7 +35,16 @@ type DragPayload = {
 
 type OptimisticOp =
   | { kind: "delete"; taskId: string }
+  | { kind: "skip"; taskId: string; iso: string }
   | { kind: "move"; taskId: string; fromIso: string; toIso: string };
+
+type ConfirmDelete = {
+  taskId: string;
+  taskTitle: string;
+  iso: string;
+  frequency: CalendarTask["frequency"];
+  dayLabel: string;
+};
 
 const DRAG_MIME = "application/x-portion-task";
 
@@ -36,6 +54,11 @@ function applyOptimisticOp(state: WeekDay[], op: OptimisticOp): WeekDay[] {
       ...d,
       tasks: d.tasks.filter((t) => t.id !== op.taskId),
     }));
+  }
+  if (op.kind === "skip") {
+    return state.map((d) =>
+      d.iso !== op.iso ? d : { ...d, tasks: d.tasks.filter((t) => t.id !== op.taskId) },
+    );
   }
   // move: pluck the task off the source day, attach to the target day.
   let plucked: CalendarTask | undefined;
@@ -73,6 +96,7 @@ export function TaskCalendarView({
   const [statusOverrides, setStatusOverrides] = useState<Record<string, CalendarTask["status"]>>({});
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [dropHover, setDropHover] = useState<string | null>(null); // ISO of day being hovered or "trash"
+  const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete | null>(null);
   const [optimisticDays, applyOp] = useOptimistic(days, applyOptimisticOp);
 
   function statusKey(dateISO: string, taskId: string) {
@@ -201,13 +225,42 @@ export function TaskCalendarView({
     e.preventDefault();
     setDropHover(null);
     const payload = parseDragPayload(e);
-    if (!payload) return;
-    const taskId = payload.taskId;
     setDrag(null);
+    if (!payload) return;
 
+    // Look up against the currently rendered (optimistic) state so a rapid
+    // move-then-trash sequence still finds the task at the spot the user sees.
+    const sourceDay = optimisticDays.find((d) => d.iso === payload.fromIso);
+    const task = sourceDay?.tasks.find((t) => t.id === payload.taskId);
+    if (!task || !sourceDay) return;
+
+    setConfirmDelete({
+      taskId: task.id,
+      taskTitle: task.title,
+      iso: sourceDay.iso,
+      frequency: task.frequency,
+      dayLabel: sourceDay.isToday ? "today" : sourceDay.label,
+    });
+  }
+
+  function handleSkipDay(target: ConfirmDelete) {
+    setConfirmDelete(null);
     startTransition(async () => {
-      applyOp({ kind: "delete", taskId });
-      const res = await deleteTask(taskId);
+      applyOp({ kind: "skip", taskId: target.taskId, iso: target.iso });
+      const res = await skipTaskForDate({ taskId: target.taskId, date: target.iso });
+      if ("error" in res) {
+        toast.error(res.error);
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
+  function handleDeleteAll(target: ConfirmDelete) {
+    setConfirmDelete(null);
+    startTransition(async () => {
+      applyOp({ kind: "delete", taskId: target.taskId });
+      const res = await deleteTask(target.taskId);
       if ("error" in res) {
         toast.error(res.error);
       } else {
@@ -333,6 +386,49 @@ export function TaskCalendarView({
       {pending && (
         <div className="text-xs text-muted-foreground">Saving…</div>
       )}
+
+      <Dialog
+        open={!!confirmDelete}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDelete(null);
+        }}
+      >
+        <DialogContent>
+          {confirmDelete && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Delete &ldquo;{confirmDelete.taskTitle}&rdquo;?</DialogTitle>
+                <DialogDescription>
+                  {confirmDelete.frequency === "ONE_TIME"
+                    ? "This task is scheduled for one day only — deleting removes it permanently."
+                    : confirmDelete.frequency === "DAILY"
+                      ? `This task runs every day. Skip just ${confirmDelete.dayLabel}, or delete it from every day going forward?`
+                      : `This task is scheduled weekly. Skip just this ${confirmDelete.dayLabel}, or delete it from every week going forward?`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmDelete(null)}>
+                  Cancel
+                </Button>
+                {confirmDelete.frequency !== "ONE_TIME" && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleSkipDay(confirmDelete)}
+                  >
+                    Skip {confirmDelete.dayLabel}
+                  </Button>
+                )}
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDeleteAll(confirmDelete)}
+                >
+                  Delete task
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

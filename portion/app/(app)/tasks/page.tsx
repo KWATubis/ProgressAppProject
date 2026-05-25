@@ -59,7 +59,10 @@ export default async function TasksPage({
         pillar: t.pillar,
         frequency: t.frequency,
         status: logIndex.get(logKey(t.id, d)) ?? "PENDING",
-      }));
+      }))
+      // SKIPPED tasks are hidden for that specific day. The recurring task
+      // itself stays untouched and shows on its other scheduled days.
+      .filter((t) => t.status !== "SKIPPED");
     return {
       iso: formatISODate(d),
       label: DAY_LABELS[d.getUTCDay()],

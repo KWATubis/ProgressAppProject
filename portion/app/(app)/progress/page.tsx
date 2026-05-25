@@ -126,14 +126,19 @@ export default async function ProgressPage({
       .map((t) => t.id);
 
     const statuses = logsByDate.get(iso);
-    if (scheduledTaskIds.length === 0) {
-      // No tasks scheduled — neutral day, score unchanged.
+    // SKIPPED tasks for the day are excluded — they don't count toward the
+    // perfect-day target and they don't count as misses.
+    const relevantIds = scheduledTaskIds.filter(
+      (id) => statuses?.get(id) !== "SKIPPED",
+    );
+    if (relevantIds.length === 0) {
+      // No tasks scheduled (or all skipped) — neutral day, score unchanged.
       progressData.push({ date: iso, score: Number(score.toFixed(4)) });
       continue;
     }
 
     let missed = 0;
-    for (const id of scheduledTaskIds) {
+    for (const id of relevantIds) {
       const s = statuses?.get(id);
       if (s !== "COMPLETE") missed++;
     }

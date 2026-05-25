@@ -74,6 +74,56 @@ export async function moveTask(input: MoveTaskInput): Promise<ActionResult> {
   return { ok: true };
 }
 
+const skipSchema = z.object({
+  taskId: z.string().min(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+export async function skipTaskForDate(
+  input: z.infer<typeof skipSchema>,
+): Promise<ActionResult> {
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return { error: "Not authenticated." };
+  }
+
+  const parsed = skipSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { taskId, date } = parsed.data;
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, profileId: user.id },
+    select: { id: true },
+  });
+  if (!task) return { error: "Task not found." };
+
+  const dateMidnight = parseISODate(date);
+
+  try {
+    await prisma.taskLog.upsert({
+      where: { taskId_date: { taskId, date: dateMidnight } },
+      create: {
+        profileId: user.id,
+        taskId,
+        date: dateMidnight,
+        status: "SKIPPED",
+      },
+      update: { status: "SKIPPED" },
+    });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to skip task." };
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/dashboard");
+  revalidatePath("/progress");
+  return { ok: true };
+}
+
 export async function deleteTask(taskId: string): Promise<ActionResult> {
   let user;
   try {
