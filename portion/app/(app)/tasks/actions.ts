@@ -39,11 +39,11 @@ export async function moveTask(input: MoveTaskInput): Promise<ActionResult> {
   }
   const data = parsed.data;
 
-  const task = await prisma.task.findUnique({
-    where: { id: data.taskId },
-    select: { profileId: true, frequency: true, dayOfWeek: true },
+  const task = await prisma.task.findFirst({
+    where: { id: data.taskId, profileId: user.id },
+    select: { frequency: true, dayOfWeek: true },
   });
-  if (!task || task.profileId !== user.id) return { error: "Task not found." };
+  if (!task) return { error: "Task not found." };
 
   const updates: { dayOfWeek?: number[]; scheduledAt?: Date | null } = {};
 
@@ -82,17 +82,15 @@ export async function deleteTask(taskId: string): Promise<ActionResult> {
     return { error: "Not authenticated." };
   }
 
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
-    select: { profileId: true },
-  });
-  if (!task || task.profileId !== user.id) return { error: "Task not found." };
-
+  let result;
   try {
-    await prisma.task.delete({ where: { id: taskId } });
+    result = await prisma.task.deleteMany({
+      where: { id: taskId, profileId: user.id },
+    });
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Failed to delete task." };
   }
+  if (result.count === 0) return { error: "Task not found." };
 
   revalidatePath("/tasks");
   revalidatePath("/dashboard");

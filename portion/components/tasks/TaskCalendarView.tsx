@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +24,36 @@ type DragPayload = {
   frequency: CalendarTask["frequency"];
 };
 
+type OptimisticOp =
+  | { kind: "delete"; taskId: string }
+  | { kind: "move"; taskId: string; fromIso: string; toIso: string };
+
 const DRAG_MIME = "application/x-portion-task";
+
+function applyOptimisticOp(state: WeekDay[], op: OptimisticOp): WeekDay[] {
+  if (op.kind === "delete") {
+    return state.map((d) => ({
+      ...d,
+      tasks: d.tasks.filter((t) => t.id !== op.taskId),
+    }));
+  }
+  // move: pluck the task off the source day, attach to the target day.
+  let plucked: CalendarTask | undefined;
+  const next = state.map((d) => {
+    if (d.iso !== op.fromIso) return d;
+    const idx = d.tasks.findIndex((t) => t.id === op.taskId);
+    if (idx < 0) return d;
+    plucked = d.tasks[idx];
+    return { ...d, tasks: d.tasks.filter((_, i) => i !== idx) };
+  });
+  if (!plucked) return state;
+  return next.map((d) => {
+    if (d.iso !== op.toIso) return d;
+    // If task already shows on the target (WEEKLY with overlapping days), skip.
+    if (d.tasks.some((t) => t.id === op.taskId)) return d;
+    return { ...d, tasks: [...d.tasks, plucked!] };
+  });
+}
 
 export function TaskCalendarView({
   days,
@@ -44,6 +73,7 @@ export function TaskCalendarView({
   const [statusOverrides, setStatusOverrides] = useState<Record<string, CalendarTask["status"]>>({});
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [dropHover, setDropHover] = useState<string | null>(null); // ISO of day being hovered or "trash"
+  const [optimisticDays, applyOp] = useOptimistic(days, applyOptimisticOp);
 
   function statusKey(dateISO: string, taskId: string) {
     return `${dateISO}::${taskId}`;
@@ -145,11 +175,11 @@ export function TaskCalendarView({
     setDrag(null);
 
     startTransition(async () => {
+      applyOp({ kind: "move", taskId: payload.taskId, fromIso: payload.fromIso, toIso: day.iso });
       const res = await moveTask(input);
       if ("error" in res) {
         toast.error(res.error);
       } else {
-        toast.success("Task moved");
         router.refresh();
       }
     });
@@ -176,11 +206,11 @@ export function TaskCalendarView({
     setDrag(null);
 
     startTransition(async () => {
+      applyOp({ kind: "delete", taskId });
       const res = await deleteTask(taskId);
       if ("error" in res) {
         toast.error(res.error);
       } else {
-        toast.success("Task deleted");
         router.refresh();
       }
     });
@@ -223,7 +253,7 @@ export function TaskCalendarView({
       </div>
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-7">
-        {days.map((day) => {
+        {optimisticDays.map((day) => {
           const isHover = dropHover === day.iso;
           const isSource = drag?.fromIso === day.iso;
           return (
