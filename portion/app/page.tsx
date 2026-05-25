@@ -17,7 +17,6 @@ const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const LIME = "#C8FF00";
 
 export default function LandingPage() {
   const heroRef = useRef<HTMLDivElement>(null);
@@ -37,30 +36,30 @@ export default function LandingPage() {
 
   return (
     <div
-      className={`${bebas.variable} ${dmMono.variable} ${dmSans.variable} relative min-h-screen overflow-x-hidden bg-[#070707] text-[#F0EFE8]`}
+      className={`${bebas.variable} ${dmMono.variable} ${dmSans.variable} relative min-h-screen overflow-x-hidden bg-[#080808] text-white`}
       style={{ fontFamily: "var(--font-dm-sans)" }}
     >
-      {/* Grid texture */}
+      {/* Subtle grid */}
       <div
-        className="pointer-events-none fixed inset-0 -z-20 opacity-[0.022]"
+        className="pointer-events-none fixed inset-0 -z-20 opacity-[0.018]"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(240,239,232,1) 1px,transparent 1px),linear-gradient(90deg,rgba(240,239,232,1) 1px,transparent 1px)",
+            "linear-gradient(white 1px,transparent 1px),linear-gradient(90deg,white 1px,transparent 1px)",
           backgroundSize: "64px 64px",
         }}
       />
 
-      {/* Ambient orbs */}
+      {/* White ambient orbs */}
       <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
         <motion.div
           className="absolute -top-48 left-1/3 h-[720px] w-[720px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(200,255,0,0.07) 0%, transparent 65%)" }}
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 65%)" }}
           animate={{ x: [0, 100, -50, 0], y: [0, 60, -30, 0] }}
           transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
         />
         <motion.div
           className="absolute bottom-0 right-1/4 h-[500px] w-[500px] rounded-full"
-          style={{ background: "radial-gradient(circle, rgba(200,255,0,0.04) 0%, transparent 65%)" }}
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.04) 0%, transparent 65%)" }}
           animate={{ x: [0, -70, 50, 0], y: [0, -50, 60, 0] }}
           transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
         />
@@ -75,11 +74,11 @@ export default function LandingPage() {
       >
         <div className="flex items-center gap-3">
           <div
-            className="h-2.5 w-2.5"
-            style={{ background: LIME, boxShadow: `0 0 24px rgba(200,255,0,0.6)` }}
+            className="h-2.5 w-2.5 bg-white"
+            style={{ boxShadow: "0 0 20px rgba(255,255,255,0.7)" }}
           />
           <span
-            className="text-[22px] tracking-[0.18em]"
+            className="text-[22px] tracking-[0.18em] text-white"
             style={{ fontFamily: "var(--font-bebas)" }}
           >
             PORTION
@@ -87,7 +86,7 @@ export default function LandingPage() {
         </div>
         <Link
           href="/auth/login"
-          className="text-sm text-[#F0EFE8]/40 transition hover:text-[#F0EFE8]/80"
+          className="text-sm text-white/40 transition hover:text-white/80"
         >
           Sign in
         </Link>
@@ -104,26 +103,22 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: EASE }}
-          className="mb-8 inline-flex items-center gap-2.5 px-4 py-1.5 text-[11px] font-medium uppercase tracking-widest"
-          style={{ border: `1px solid rgba(200,255,0,0.28)`, color: LIME, background: "rgba(200,255,0,0.05)" }}
+          className="mb-8 inline-flex items-center gap-2.5 border border-white/15 bg-white/5 px-4 py-1.5 text-[11px] font-medium uppercase tracking-widest text-white/55"
         >
           <span className="relative flex h-1.5 w-1.5">
-            <span
-              className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
-              style={{ background: LIME }}
-            />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full" style={{ background: LIME }} />
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-white" />
           </span>
           Built for the ones who do both
         </motion.div>
 
-        {/* Headline: slides up */}
+        {/* Headline */}
         <div className="overflow-hidden">
           <motion.div
             initial={{ y: "105%" }}
             animate={{ y: "0%" }}
             transition={{ duration: 0.85, ease: EASE, delay: 0.12 }}
-            className="block leading-[0.87]"
+            className="block leading-[0.87] text-white"
             style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(56px, 12vw, 148px)" }}
           >
             YOU&apos;RE GOING
@@ -138,8 +133,9 @@ export default function LandingPage() {
             style={{
               fontFamily: "var(--font-bebas)",
               fontSize: "clamp(56px, 12vw, 148px)",
-              color: LIME,
-              textShadow: `0 0 80px rgba(200,255,0,0.22)`,
+              WebkitTextStroke: "2px rgba(255,255,255,0.85)",
+              color: "transparent",
+              textShadow: "0 0 60px rgba(255,255,255,0.12)",
             }}
           >
             ALL IN.
@@ -152,7 +148,7 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: EASE, delay: 0.38 }}
-            className="max-w-sm text-base leading-relaxed text-[#F0EFE8]/50"
+            className="max-w-sm text-base leading-relaxed text-white/50"
           >
             The only tracker built for both. Train your body, build your income —
             one place, nothing slipping through the cracks.
@@ -166,13 +162,12 @@ export default function LandingPage() {
           >
             <Link
               href="/onboarding"
-              className="group inline-flex items-center gap-2.5 px-8 py-4 text-sm font-semibold text-[#070707] transition-transform hover:scale-[1.03] active:scale-[0.97]"
-              style={{ background: LIME }}
+              className="group inline-flex items-center gap-2.5 bg-white px-8 py-4 text-sm font-semibold text-[#080808] transition-transform hover:scale-[1.03] active:scale-[0.97]"
             >
               Start Building
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Link>
-            <Link href="/auth/login" className="text-xs text-[#F0EFE8]/35">
+            <Link href="/auth/login" className="text-xs text-white/30">
               Already have an account
             </Link>
           </motion.div>
@@ -184,7 +179,7 @@ export default function LandingPage() {
           animate={{ scaleX: 1 }}
           transition={{ duration: 1.0, ease: EASE, delay: 0.55 }}
           className="mt-14 h-px origin-left"
-          style={{ background: `linear-gradient(90deg, rgba(200,255,0,0.65), rgba(240,239,232,0.05) 55%, transparent)` }}
+          style={{ background: "linear-gradient(90deg, rgba(255,255,255,0.5), rgba(255,255,255,0.04) 55%, transparent)" }}
         />
 
         {/* 3D Dashboard */}
@@ -201,8 +196,8 @@ export default function LandingPage() {
             <div
               className="p-[1px]"
               style={{
-                background: `linear-gradient(130deg, rgba(200,255,0,0.25) 0%, rgba(240,239,232,0.06) 40%, transparent 100%)`,
-                boxShadow: "0 40px 160px -20px rgba(0,0,0,0.95)",
+                background: "linear-gradient(130deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.05) 40%, transparent 100%)",
+                boxShadow: "0 40px 160px -20px rgba(0,0,0,0.97)",
               }}
             >
               <div className="bg-[#0C0C0A]">
@@ -212,7 +207,7 @@ export default function LandingPage() {
           </motion.div>
           <div
             className="pointer-events-none absolute -bottom-14 left-1/2 h-36 w-3/4 -translate-x-1/2 rounded-full blur-3xl"
-            style={{ background: "rgba(200,255,0,0.05)" }}
+            style={{ background: "rgba(255,255,255,0.04)" }}
           />
         </motion.div>
       </motion.section>
@@ -227,13 +222,13 @@ export default function LandingPage() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: false, amount: 0.5 }}
           transition={{ duration: 0.7, ease: EASE }}
-          className="mb-14 max-w-lg text-sm leading-relaxed text-[#F0EFE8]/45"
+          className="mb-14 max-w-lg text-sm leading-relaxed text-white/40"
         >
           You have the discipline. What you don&apos;t have is one place to see it all working.
         </motion.p>
 
         {/* Pillar cards */}
-        <div className="grid gap-px sm:grid-cols-2" style={{ background: "rgba(240,239,232,0.05)" }}>
+        <div className="grid gap-px sm:grid-cols-2" style={{ background: "rgba(255,255,255,0.05)" }}>
           <PillarCard
             index={0}
             icon={<Dumbbell className="h-5 w-5" />}
@@ -261,7 +256,7 @@ export default function LandingPage() {
         </div>
 
         {/* Stats strip */}
-        <div className="mt-px grid grid-cols-2 gap-px sm:grid-cols-4" style={{ background: "rgba(240,239,232,0.05)" }}>
+        <div className="mt-px grid grid-cols-2 gap-px sm:grid-cols-4" style={{ background: "rgba(255,255,255,0.05)" }}>
           {[
             { n: "184", label: "Sessions logged" },
             { n: "47", label: "Day streak" },
@@ -274,15 +269,15 @@ export default function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: false, amount: 0.4 }}
               transition={{ duration: 0.5, ease: EASE, delay: i * 0.07 }}
-              className="bg-[#070707] px-7 py-8"
+              className="bg-[#080808] px-7 py-8"
             >
               <div
-                className="text-[40px] font-medium leading-none"
-                style={{ fontFamily: "var(--font-dm-mono)", color: LIME }}
+                className="text-[40px] font-medium leading-none text-white"
+                style={{ fontFamily: "var(--font-dm-mono)" }}
               >
                 {item.n}
               </div>
-              <div className="mt-2.5 text-[11px] uppercase tracking-widest text-[#F0EFE8]/35">
+              <div className="mt-2.5 text-[11px] uppercase tracking-widest text-white/30">
                 {item.label}
               </div>
             </motion.div>
@@ -295,24 +290,30 @@ export default function LandingPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false, amount: 0.25 }}
           transition={{ duration: 0.7, ease: EASE }}
-          className="mt-px bg-[#070707] px-10 py-16 sm:px-16 sm:py-20"
-          style={{ border: "1px solid rgba(200,255,0,0.08)" }}
+          className="mt-px bg-[#080808] px-10 py-16 sm:px-16 sm:py-20"
+          style={{ border: "1px solid rgba(255,255,255,0.07)" }}
         >
           <div
-            className="leading-[0.88]"
+            className="leading-[0.88] text-white"
             style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(40px, 8vw, 96px)" }}
           >
             STOP HOPING.
             <br />
-            <span style={{ color: LIME }}>START TRACKING.</span>
+            <span
+              style={{
+                WebkitTextStroke: "2px rgba(255,255,255,0.85)",
+                color: "transparent",
+              }}
+            >
+              START TRACKING.
+            </span>
           </div>
-          <p className="mt-6 max-w-sm text-sm leading-relaxed text-[#F0EFE8]/45">
+          <p className="mt-6 max-w-sm text-sm leading-relaxed text-white/40">
             One year from now you&apos;ll wish you started today. Don&apos;t be that guy.
           </p>
           <Link
             href="/onboarding"
-            className="group mt-10 inline-flex items-center gap-2.5 px-8 py-4 text-sm font-semibold text-[#070707] transition-transform hover:scale-[1.03] active:scale-[0.97]"
-            style={{ background: LIME }}
+            className="group mt-10 inline-flex items-center gap-2.5 bg-white px-8 py-4 text-sm font-semibold text-[#080808] transition-transform hover:scale-[1.03] active:scale-[0.97]"
           >
             Start Building
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -321,7 +322,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-[#F0EFE8]/5 px-8 py-8 text-xs text-[#F0EFE8]/25 sm:px-12">
+      <footer className="relative z-10 border-t border-white/5 px-8 py-8 text-xs text-white/20 sm:px-12">
         Portion · built for the ones who do both
       </footer>
     </div>
@@ -332,31 +333,31 @@ function DashboardMockup() {
   return (
     <div style={{ fontFamily: "var(--font-dm-sans)" }}>
       {/* Window chrome */}
-      <div className="flex items-center justify-between border-b border-[#F0EFE8]/5 px-5 py-3">
+      <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
         <div className="flex items-center gap-2">
-          <div className="h-2.5 w-2.5 rounded-full bg-[#F0EFE8]/10" />
-          <div className="h-2.5 w-2.5 rounded-full bg-[#F0EFE8]/10" />
-          <div className="h-2.5 w-2.5 rounded-full bg-[#F0EFE8]/10" />
+          <div className="h-2.5 w-2.5 rounded-full bg-white/10" />
+          <div className="h-2.5 w-2.5 rounded-full bg-white/10" />
+          <div className="h-2.5 w-2.5 rounded-full bg-white/10" />
         </div>
         <div
-          className="text-[10px] uppercase tracking-widest text-[#F0EFE8]/30"
+          className="text-[10px] uppercase tracking-widest text-white/25"
           style={{ fontFamily: "var(--font-dm-mono)" }}
         >
           portion · dashboard
         </div>
-        <div className="text-[10px] text-[#F0EFE8]/30" style={{ fontFamily: "var(--font-dm-mono)" }}>
+        <div className="text-[10px] text-white/25" style={{ fontFamily: "var(--font-dm-mono)" }}>
           Today
         </div>
       </div>
 
-      <div className="grid grid-cols-12 gap-[1px]" style={{ background: "rgba(240,239,232,0.04)" }}>
+      <div className="grid grid-cols-12 gap-[1px]" style={{ background: "rgba(255,255,255,0.04)" }}>
         {/* Health */}
         <div className="col-span-12 bg-[#0C0C0A] p-5 sm:col-span-7">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-[#F0EFE8]/50">
+            <div className="flex items-center gap-2 text-xs text-white/45">
               <Dumbbell className="h-3.5 w-3.5" /> Health
             </div>
-            <div className="text-[10px] text-[#F0EFE8]/30" style={{ fontFamily: "var(--font-dm-mono)" }}>
+            <div className="text-[10px] text-white/25" style={{ fontFamily: "var(--font-dm-mono)" }}>
               Push · Day 47/120
             </div>
           </div>
@@ -364,14 +365,14 @@ function DashboardMockup() {
           <div className="mt-5">
             <div className="flex items-end justify-between">
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-[#F0EFE8]/35">Body weight</div>
-                <div className="mt-1 text-2xl font-semibold" style={{ fontFamily: "var(--font-dm-mono)" }}>
+                <div className="text-[10px] uppercase tracking-wider text-white/30">Body weight</div>
+                <div className="mt-1 text-2xl font-semibold text-white" style={{ fontFamily: "var(--font-dm-mono)" }}>
                   71.4 kg
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[10px] uppercase tracking-wider text-[#F0EFE8]/35">Target</div>
-                <div className="mt-1 text-sm" style={{ fontFamily: "var(--font-dm-mono)", color: LIME }}>
+                <div className="text-[10px] uppercase tracking-wider text-white/30">Target</div>
+                <div className="mt-1 text-sm text-white/70" style={{ fontFamily: "var(--font-dm-mono)" }}>
                   68.0 kg · Jul 4
                 </div>
               </div>
@@ -379,18 +380,18 @@ function DashboardMockup() {
 
             <svg viewBox="0 0 300 60" className="mt-3 h-14 w-full">
               <defs>
-                <linearGradient id="wg2" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor={LIME} stopOpacity="0.25" />
-                  <stop offset="100%" stopColor={LIME} stopOpacity="0" />
+                <linearGradient id="wg3" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="white" stopOpacity="0.18" />
+                  <stop offset="100%" stopColor="white" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path
                 d="M0,16 C40,22 70,14 100,26 C130,38 160,34 190,40 C220,46 250,43 300,50"
-                stroke={LIME} strokeWidth="1.5" fill="none" strokeOpacity="0.75"
+                stroke="rgba(255,255,255,0.65)" strokeWidth="1.5" fill="none"
               />
               <path
                 d="M0,16 C40,22 70,14 100,26 C130,38 160,34 190,40 C220,46 250,43 300,50 L300,60 L0,60 Z"
-                fill="url(#wg2)"
+                fill="url(#wg3)"
               />
             </svg>
           </div>
@@ -403,17 +404,17 @@ function DashboardMockup() {
             ].map((m) => (
               <div key={m.label}>
                 <div className="flex items-baseline justify-between">
-                  <div className="text-[10px] uppercase tracking-wider text-[#F0EFE8]/35">{m.label}</div>
-                  <div className="text-[10px] text-[#F0EFE8]/50" style={{ fontFamily: "var(--font-dm-mono)" }}>
+                  <div className="text-[10px] uppercase tracking-wider text-white/30">{m.label}</div>
+                  <div className="text-[10px] text-white/45" style={{ fontFamily: "var(--font-dm-mono)" }}>
                     {m.value}/{m.target}
                   </div>
                 </div>
-                <div className="mt-1.5 h-1 bg-[#F0EFE8]/5">
+                <div className="mt-1.5 h-1 bg-white/5">
                   <div
                     className="h-full"
                     style={{
                       width: `${(m.value / m.target) * 100}%`,
-                      background: `linear-gradient(90deg, ${LIME}, rgba(200,255,0,0.55))`,
+                      background: "linear-gradient(90deg, rgba(255,255,255,0.8), rgba(255,255,255,0.35))",
                     }}
                   />
                 </div>
@@ -425,30 +426,33 @@ function DashboardMockup() {
         {/* Money */}
         <div className="col-span-12 bg-[#0C0C0A] p-5 sm:col-span-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-[#F0EFE8]/50">
+            <div className="flex items-center gap-2 text-xs text-white/45">
               <TrendingUp className="h-3.5 w-3.5" /> Money
             </div>
-            <div className="text-[10px] text-[#F0EFE8]/30" style={{ fontFamily: "var(--font-dm-mono)" }}>
+            <div className="text-[10px] text-white/25" style={{ fontFamily: "var(--font-dm-mono)" }}>
               This month
             </div>
           </div>
 
           <div className="mt-5">
-            <div className="text-[10px] uppercase tracking-wider text-[#F0EFE8]/35">Revenue</div>
+            <div className="text-[10px] uppercase tracking-wider text-white/30">Revenue</div>
             <div className="mt-1 flex items-baseline gap-2">
-              <div className="text-2xl font-semibold" style={{ fontFamily: "var(--font-dm-mono)", color: LIME }}>
+              <div className="text-2xl font-semibold text-white" style={{ fontFamily: "var(--font-dm-mono)" }}>
                 €2,140
               </div>
-              <div className="text-xs text-[#F0EFE8]/40" style={{ fontFamily: "var(--font-dm-mono)" }}>
+              <div className="text-xs text-white/35" style={{ fontFamily: "var(--font-dm-mono)" }}>
                 / €3,000
               </div>
             </div>
-            <div className="mt-2 h-1 bg-[#F0EFE8]/5">
-              <div className="h-full w-[71%]" style={{ background: `linear-gradient(90deg, ${LIME}, rgba(200,255,0,0.55))` }} />
+            <div className="mt-2 h-1 bg-white/5">
+              <div
+                className="h-full w-[71%]"
+                style={{ background: "linear-gradient(90deg, rgba(255,255,255,0.8), rgba(255,255,255,0.35))" }}
+              />
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-[1px]" style={{ background: "rgba(240,239,232,0.05)" }}>
+          <div className="mt-5 grid grid-cols-2 gap-[1px]" style={{ background: "rgba(255,255,255,0.05)" }}>
             {[
               { label: "Deep work", value: "18h" },
               { label: "Calls / wk", value: "9" },
@@ -456,8 +460,8 @@ function DashboardMockup() {
               { label: "Growth", value: "+11%" },
             ].map((s) => (
               <div key={s.label} className="bg-[#0C0C0A] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wider text-[#F0EFE8]/30">{s.label}</div>
-                <div className="mt-0.5 text-sm font-medium" style={{ fontFamily: "var(--font-dm-mono)" }}>
+                <div className="text-[10px] uppercase tracking-wider text-white/25">{s.label}</div>
+                <div className="mt-0.5 text-sm font-medium text-white" style={{ fontFamily: "var(--font-dm-mono)" }}>
                   {s.value}
                 </div>
               </div>
@@ -468,10 +472,10 @@ function DashboardMockup() {
         {/* Tasks */}
         <div className="col-span-12 bg-[#0C0C0A] p-5">
           <div className="mb-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-[#F0EFE8]/50">
+            <div className="flex items-center gap-2 text-xs text-white/45">
               <Target className="h-3.5 w-3.5" /> Today
             </div>
-            <div className="text-[10px]" style={{ fontFamily: "var(--font-dm-mono)", color: LIME }}>
+            <div className="text-[10px] text-white/50" style={{ fontFamily: "var(--font-dm-mono)" }}>
               4 / 6 done
             </div>
           </div>
@@ -488,20 +492,20 @@ function DashboardMockup() {
                 key={t.label}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px]"
                 style={{
-                  border: t.done ? `1px solid rgba(200,255,0,0.30)` : "1px solid rgba(240,239,232,0.08)",
-                  background: t.done ? "rgba(200,255,0,0.07)" : "transparent",
-                  color: t.done ? "#F0EFE8" : "rgba(240,239,232,0.35)",
+                  border: t.done ? "1px solid rgba(255,255,255,0.22)" : "1px solid rgba(255,255,255,0.07)",
+                  background: t.done ? "rgba(255,255,255,0.07)" : "transparent",
+                  color: t.done ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.28)",
                   fontFamily: "var(--font-dm-mono)",
                 }}
               >
                 <span
                   className="flex h-3 w-3 items-center justify-center"
                   style={{
-                    background: t.done ? LIME : "transparent",
-                    border: t.done ? "none" : "1px solid rgba(240,239,232,0.18)",
+                    background: t.done ? "white" : "transparent",
+                    border: t.done ? "none" : "1px solid rgba(255,255,255,0.15)",
                   }}
                 >
-                  {t.done && <span className="text-[8px] font-bold text-[#070707]">✓</span>}
+                  {t.done && <span className="text-[8px] font-bold text-[#080808]">✓</span>}
                 </span>
                 {t.label}
               </div>
@@ -523,9 +527,9 @@ function Marquee() {
     <div
       className="relative z-10 py-5"
       style={{
-        borderTop: "1px solid rgba(240,239,232,0.06)",
-        borderBottom: "1px solid rgba(240,239,232,0.06)",
-        background: "rgba(0,0,0,0.45)",
+        borderTop: "1px solid rgba(255,255,255,0.06)",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(0,0,0,0.5)",
       }}
     >
       <div
@@ -548,11 +552,11 @@ function Marquee() {
                 fontFamily: "var(--font-bebas)",
                 fontSize: "clamp(18px, 2.5vw, 26px)",
                 letterSpacing: "0.08em",
-                color: "rgba(240,239,232,0.22)",
+                color: "rgba(255,255,255,0.20)",
               }}
             >
               {w}
-              <span className="h-1.5 w-1.5 shrink-0" style={{ background: LIME }} />
+              <span className="h-1.5 w-1.5 shrink-0 bg-white/40" />
             </span>
           ))}
         </motion.div>
@@ -582,28 +586,25 @@ function PillarCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: false, amount: 0.2 }}
       transition={{ duration: 0.6, ease: EASE, delay: index * 0.08 }}
-      className="group relative overflow-hidden bg-[#070707] p-8"
+      className="group relative overflow-hidden bg-[#080808] p-8"
     >
-      {/* Lime top-line reveal on hover */}
-      <div
-        className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100"
-        style={{ background: LIME }}
-      />
+      {/* White top-line on hover */}
+      <div className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-white transition-transform duration-500 group-hover:scale-x-100" />
 
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5 text-xs text-[#F0EFE8]/45">
+        <div className="flex items-center gap-2.5 text-xs text-white/40">
           {icon}
           <span className="text-[14px] tracking-[0.12em]" style={{ fontFamily: "var(--font-bebas)" }}>
             {label}
           </span>
         </div>
-        <div className="h-px w-8 bg-[#F0EFE8]/10" />
+        <div className="h-px w-8 bg-white/10" />
       </div>
 
-      <h3 className="mt-5 text-xl font-semibold leading-tight tracking-tight">{title}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-[#F0EFE8]/50">{body}</p>
+      <h3 className="mt-5 text-xl font-semibold leading-tight tracking-tight text-white">{title}</h3>
+      <p className="mt-3 text-sm leading-relaxed text-white/45">{body}</p>
 
-      <div className="mt-7 grid grid-cols-3 gap-4 border-t border-[#F0EFE8]/5 pt-6">
+      <div className="mt-7 grid grid-cols-3 gap-4 border-t border-white/5 pt-6">
         {stats.map((s, i) => (
           <motion.div
             key={s.label}
@@ -612,8 +613,8 @@ function PillarCard({
             viewport={{ once: false, amount: 0.5 }}
             transition={{ duration: 0.4, ease: EASE, delay: 0.2 + i * 0.07 }}
           >
-            <div className="text-[10px] uppercase tracking-widest text-[#F0EFE8]/30">{s.label}</div>
-            <div className="mt-1 text-xl font-medium" style={{ fontFamily: "var(--font-dm-mono)", color: LIME }}>
+            <div className="text-[10px] uppercase tracking-widest text-white/25">{s.label}</div>
+            <div className="mt-1 text-xl font-medium text-white" style={{ fontFamily: "var(--font-dm-mono)" }}>
               {s.value}
             </div>
           </motion.div>
