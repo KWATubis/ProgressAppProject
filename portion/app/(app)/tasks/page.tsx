@@ -12,7 +12,6 @@ import {
 import { isTaskScheduledOn } from "@/lib/utils/tasks";
 import { TaskCalendarView, type WeekDay } from "@/components/tasks/TaskCalendarView";
 import { AddTaskDialog } from "@/components/tasks/AddTaskDialog";
-import { ManageTasksDialog, type ManageTask } from "@/components/tasks/ManageTasksDialog";
 import type { CalendarTask } from "@/components/tasks/TaskCard";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -66,6 +65,7 @@ export default async function TasksPage({
       label: DAY_LABELS[d.getUTCDay()],
       dayNum: d.getUTCDate(),
       isToday: sameUtcDay(d, today),
+      dayOfWeek: d.getUTCDay(),
       tasks: dayTasks,
     };
   });
@@ -78,14 +78,6 @@ export default async function TasksPage({
     day: "numeric",
     year: "numeric",
   })}`;
-
-  const manageTasks: ManageTask[] = tasks.map((t) => ({
-    id: t.id,
-    title: t.title,
-    pillar: t.pillar,
-    frequency: t.frequency,
-    sortOrder: t.sortOrder,
-  }));
 
   const prevWeek = formatISODate(addDays(weekStart, -7));
   const nextWeek = formatISODate(addDays(weekStart, 7));
@@ -101,10 +93,7 @@ export default async function TasksPage({
             {tasks.length === 1 ? "task" : "tasks"}.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <ManageTasksDialog tasks={manageTasks} />
-          <AddTaskDialog />
-        </div>
+        <AddTaskDialog />
       </div>
 
       <TaskCalendarView

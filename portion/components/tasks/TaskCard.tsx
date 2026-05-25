@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Dumbbell, TrendingUp } from "lucide-react";
+import { Check, Dumbbell, GripVertical, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type CalendarTask = {
@@ -20,9 +20,17 @@ const FREQ_LABEL: Record<CalendarTask["frequency"], string> = {
 export function TaskCard({
   task,
   onToggle,
+  onDragStart,
+  onDragEnd,
+  isDragging,
+  draggable = true,
 }: {
   task: CalendarTask;
   onToggle: () => void;
+  onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
+  isDragging?: boolean;
+  draggable?: boolean;
 }) {
   const done = task.status === "COMPLETE";
   const Icon = task.pillar === "HEALTH" ? Dumbbell : TrendingUp;
@@ -32,26 +40,39 @@ export function TaskCard({
       : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100";
 
   return (
-    <button
-      type="button"
-      onClick={onToggle}
+    <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       className={cn(
-        "group flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition hover:shadow-sm",
+        "group flex w-full items-start gap-1.5 rounded-md border px-1.5 py-1.5 text-left text-xs transition hover:shadow-sm",
         accent,
         done && "opacity-60",
+        isDragging && "opacity-30",
+        draggable && "cursor-grab active:cursor-grabbing",
       )}
     >
-      <span
+      {draggable && (
+        <GripVertical className="mt-0.5 h-3 w-3 shrink-0 opacity-30 group-hover:opacity-70" />
+      )}
+      <button
+        type="button"
+        onClick={onToggle}
         className={cn(
           "mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition",
           done
             ? "border-current bg-current/80"
-            : "border-current/40 group-hover:border-current",
+            : "border-current/40 hover:border-current",
         )}
+        aria-label={done ? "Mark incomplete" : "Mark complete"}
       >
         {done && <Check className="h-2.5 w-2.5 text-background" strokeWidth={3} />}
-      </span>
-      <span className="min-w-0 flex-1">
+      </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="min-w-0 flex-1 text-left"
+      >
         <span className={cn("block truncate font-medium", done && "line-through")}>
           {task.title}
         </span>
@@ -59,7 +80,7 @@ export function TaskCard({
           <Icon className="h-2.5 w-2.5" />
           {FREQ_LABEL[task.frequency]}
         </span>
-      </span>
-    </button>
+      </button>
+    </div>
   );
 }

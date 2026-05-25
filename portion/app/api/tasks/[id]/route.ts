@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { parseISODate } from "@/lib/utils/dates";
 
 const patchSchema = z.object({
   title: z.string().min(1).max(120).optional(),
@@ -9,12 +10,25 @@ const patchSchema = z.object({
   pillar: z.enum(["HEALTH", "MONEY"]).optional(),
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
+  /** Move a recurring task from one weekday to another. Day-of-week, 0-6. */
+  moveFromDay: z.number().int().min(0).max(6).optional(),
+  moveToDay: z.number().int().min(0).max(6).optional(),
+  /** Reschedule a ONE_TIME task to a new date (YYYY-MM-DD). */
+  scheduledAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
 async function requireOwned(taskId: string, userId: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { id: true, profileId: true, pillar: true, sortOrder: true },
+    select: {
+      id: true,
+      profileId: true,
+      pillar: true,
+      sortOrder: true,
+      frequency: true,
+      dayOfWeek: true,
+      scheduledAt: true,
+    },
   });
   if (!task || task.profileId !== userId) return null;
   return task;
@@ -41,6 +55,32 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     );
   }
 
+  // Compute schedule-related updates based on the existing task and the move
+  // payload. This keeps the calendar drag-and-drop logic on the server.
+  const scheduleUpdates: {
+    dayOfWeek?: number[];
+    scheduledAt?: Date | null;
+    frequency?: "DAILY" | "WEEKLY" | "ONE_TIME";
+  } = {};
+
+  if (body.moveFromDay !== undefined && body.moveToDay !== undefined) {
+    if (body.moveFromDay !== body.moveToDay) {
+      if (owned.frequency === "WEEKLY") {
+        const set = new Set<number>(owned.dayOfWeek);
+        set.delete(body.moveFromDay);
+        set.add(body.moveToDay);
+        scheduleUpdates.dayOfWeek = Array.from(set).sort((a, b) => a - b);
+      } else if (owned.frequency === "DAILY") {
+        // Daily tasks are scheduled every day already — no change.
+      }
+      // ONE_TIME ignored here; use scheduledAt below for date moves.
+    }
+  }
+
+  if (body.scheduledAt !== undefined) {
+    scheduleUpdates.scheduledAt = body.scheduledAt ? parseISODate(body.scheduledAt) : null;
+  }
+
   const task = await prisma.task.update({
     where: { id },
     data: {
@@ -49,6 +89,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       ...(body.pillar !== undefined && { pillar: body.pillar }),
       ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
       ...(body.isActive !== undefined && { isActive: body.isActive }),
+      ...scheduleUpdates,
     },
   });
 

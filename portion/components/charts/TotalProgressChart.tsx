@@ -30,6 +30,24 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
     return { score: d.score, label };
   });
 
+  // Dynamic Y-axis: ~3× the most recent score, with a floor so very low
+  // early-game scores still have visible movement.
+  const latest = formatted[formatted.length - 1]?.score ?? 1;
+  const peak = Math.max(...formatted.map((d) => d.score), latest);
+  const yMaxRaw = Math.max(latest * 3, peak * 1.1, 3);
+  const niceCeil = (n: number) => {
+    if (n <= 3) return 3;
+    if (n <= 6) return 6;
+    if (n <= 10) return 10;
+    if (n <= 30) return Math.ceil(n / 5) * 5;
+    if (n <= 100) return Math.ceil(n / 10) * 10;
+    return Math.ceil(n / 50) * 50;
+  };
+  const yMax = niceCeil(yMaxRaw);
+  const tickValues = [0, yMax * 0.25, yMax * 0.5, yMax * 0.75, yMax].map(
+    (v) => Number(v.toFixed(yMax < 10 ? 1 : 0)),
+  );
+
   return (
     <ChartFrame height={180}>
       <AreaChart data={formatted} margin={{ top: 8, right: 12, left: -28, bottom: 0 }}>
@@ -47,13 +65,13 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
           axisLine={false}
         />
         <YAxis
-          domain={[0, 90]}
-          ticks={[0, 15, 30, 45, 60, 75, 90]}
+          domain={[0, yMax]}
+          ticks={tickValues}
           tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
           tickLine={false}
           axisLine={false}
-          allowDataOverflow
         />
+
         <Tooltip
           contentStyle={{
             background: "hsl(var(--card))",
