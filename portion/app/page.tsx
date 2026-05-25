@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef } from "react";
-import { Bebas_Neue, DM_Mono, DM_Sans } from "next/font/google";
+import { Barlow_Condensed, DM_Mono, DM_Sans } from "next/font/google";
 import {
   motion,
   useMotionValue,
@@ -12,7 +12,7 @@ import {
 } from "framer-motion";
 import { ArrowRight, Dumbbell, TrendingUp, Target } from "lucide-react";
 
-const bebas = Bebas_Neue({ weight: "400", subsets: ["latin"], variable: "--font-bebas" });
+const display = Barlow_Condensed({ weight: ["700", "900"], subsets: ["latin"], variable: "--font-display" });
 const dmMono = DM_Mono({ weight: ["400", "500"], subsets: ["latin"], variable: "--font-dm-mono" });
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-dm-sans" });
 
@@ -36,7 +36,7 @@ export default function LandingPage() {
 
   return (
     <div
-      className={`${bebas.variable} ${dmMono.variable} ${dmSans.variable} relative min-h-screen overflow-x-hidden bg-[#080808] text-white`}
+      className={`${display.variable} ${dmMono.variable} ${dmSans.variable} relative min-h-screen overflow-x-hidden bg-[#080808] text-white`}
       style={{ fontFamily: "var(--font-dm-sans)" }}
     >
       {/* Subtle grid */}
@@ -78,8 +78,8 @@ export default function LandingPage() {
             style={{ boxShadow: "0 0 20px rgba(255,255,255,0.7)" }}
           />
           <span
-            className="text-[22px] tracking-[0.18em] text-white"
-            style={{ fontFamily: "var(--font-bebas)" }}
+            className="text-[22px] tracking-[0.22em] text-white"
+            style={{ fontFamily: "var(--font-display)", fontWeight: 900 }}
           >
             PORTION
           </span>
@@ -119,7 +119,7 @@ export default function LandingPage() {
             animate={{ y: "0%" }}
             transition={{ duration: 0.85, ease: EASE, delay: 0.12 }}
             className="block leading-[0.87] text-white"
-            style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(56px, 12vw, 148px)" }}
+            style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "clamp(52px, 11vw, 138px)" }}
           >
             YOU&apos;RE GOING
           </motion.div>
@@ -131,8 +131,9 @@ export default function LandingPage() {
             transition={{ duration: 0.85, ease: EASE, delay: 0.22 }}
             className="block leading-[0.87]"
             style={{
-              fontFamily: "var(--font-bebas)",
-              fontSize: "clamp(56px, 12vw, 148px)",
+              fontFamily: "var(--font-display)",
+              fontWeight: 900,
+              fontSize: "clamp(52px, 11vw, 138px)",
               WebkitTextStroke: "2px rgba(255,255,255,0.85)",
               color: "transparent",
               textShadow: "0 0 60px rgba(255,255,255,0.12)",
@@ -295,7 +296,7 @@ export default function LandingPage() {
         >
           <div
             className="leading-[0.88] text-white"
-            style={{ fontFamily: "var(--font-bebas)", fontSize: "clamp(40px, 8vw, 96px)" }}
+            style={{ fontFamily: "var(--font-display)", fontWeight: 900, fontSize: "clamp(38px, 7.5vw, 90px)" }}
           >
             STOP HOPING.
             <br />
@@ -476,14 +477,13 @@ function DashboardMockup() {
               <Target className="h-3.5 w-3.5" /> Today
             </div>
             <div className="text-[10px] text-white/50" style={{ fontFamily: "var(--font-dm-mono)" }}>
-              4 / 6 done
+              3 / 5 done
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {[
               { label: "Push session · 60 min", done: true },
               { label: "Hit 180g protein", done: true },
-              { label: "Ship 1 piece of content", done: true },
               { label: "Deep work · 2h", done: true },
               { label: "Cold shower", done: false },
               { label: "Reply to DMs", done: false },
@@ -549,9 +549,10 @@ function Marquee() {
               key={i}
               className="flex shrink-0 items-center gap-10"
               style={{
-                fontFamily: "var(--font-bebas)",
+                fontFamily: "var(--font-display)",
+                fontWeight: 900,
                 fontSize: "clamp(18px, 2.5vw, 26px)",
-                letterSpacing: "0.08em",
+                letterSpacing: "0.06em",
                 color: "rgba(255,255,255,0.20)",
               }}
             >
@@ -594,7 +595,7 @@ function PillarCard({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5 text-xs text-white/40">
           {icon}
-          <span className="text-[14px] tracking-[0.12em]" style={{ fontFamily: "var(--font-bebas)" }}>
+          <span className="text-[14px] tracking-[0.08em]" style={{ fontFamily: "var(--font-display)", fontWeight: 900 }}>
             {label}
           </span>
         </div>
