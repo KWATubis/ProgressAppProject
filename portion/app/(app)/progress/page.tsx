@@ -138,11 +138,16 @@ export default async function ProgressPage({
       if (s !== "COMPLETE") missed++;
     }
 
+    // Perfect day → +1%. 1 miss → flat. Each additional miss past that
+    // shaves another 0.5%: 2 → -0.5%, 3 → -1%, 4 → -1.5%, 5 → -2%, …
+    // Capped at -5%/day so a bad week can't wipe the score in one day.
     let multiplier = 1;
-    if (missed === 0) multiplier = 1.01; // perfect day → +1%
-    else if (missed === 1) multiplier = 1.0; // missed 1 → flat
-    else if (missed === 2) multiplier = 0.995; // missed 2 → -0.5%
-    else multiplier = 0.99; // missed 3+ → -1%
+    if (missed === 0) multiplier = 1.01;
+    else if (missed === 1) multiplier = 1.0;
+    else {
+      const penalty = Math.min((missed - 1) * 0.005, 0.05);
+      multiplier = 1 - penalty;
+    }
 
     score = score * multiplier;
     progressData.push({ date: iso, score: Number(score.toFixed(4)) });
@@ -226,8 +231,9 @@ export default async function ProgressPage({
         <div>
           <p className="text-sm font-semibold">Total Progress</p>
           <p className="text-xs text-muted-foreground">
-            Compound habit score — perfect days grow it 1%, two misses shave 0.5%,
-            three or more shave 1%. Currently <span className="tabular-nums text-foreground">{currentScore.toFixed(2)}</span>.
+            Compound habit score — a perfect day adds 1%; one miss is free; each
+            extra miss shaves another 0.5% (2 → −0.5%, 3 → −1%, 4 → −1.5% …).
+            Currently <span className="tabular-nums text-foreground">{currentScore.toFixed(2)}</span>.
           </p>
         </div>
         <TotalProgressChart data={progressData} />

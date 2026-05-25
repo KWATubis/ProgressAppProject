@@ -30,22 +30,15 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
     return { score: d.score, label };
   });
 
-  // Dynamic Y-axis: ~3× the most recent score, with a floor so very low
-  // early-game scores still have visible movement.
+  // Y-axis maxes out at 1.5× the most recent score so day-to-day movement is
+  // visible rather than swamped by empty headroom. Scale must accommodate any
+  // historical peak (e.g. after a long winning streak then a slide).
   const latest = formatted[formatted.length - 1]?.score ?? 1;
   const peak = Math.max(...formatted.map((d) => d.score), latest);
-  const yMaxRaw = Math.max(latest * 1.5, 3);
-  const niceCeil = (n: number) => {
-    if (n <= 3) return 3;
-    if (n <= 6) return 6;
-    if (n <= 10) return 10;
-    if (n <= 30) return Math.ceil(n / 5) * 5;
-    if (n <= 100) return Math.ceil(n / 10) * 10;
-    return Math.ceil(n / 50) * 50;
-  };
-  const yMax = niceCeil(yMaxRaw);
+  const yMax = Math.max(latest * 1.5, peak);
+  const decimals = yMax < 2 ? 2 : yMax < 10 ? 1 : 0;
   const tickValues = [0, yMax * 0.25, yMax * 0.5, yMax * 0.75, yMax].map(
-    (v) => Number(v.toFixed(yMax < 10 ? 1 : 0)),
+    (v) => Number(v.toFixed(decimals)),
   );
 
   return (

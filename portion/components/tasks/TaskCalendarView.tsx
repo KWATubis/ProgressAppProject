@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { TaskCard, type CalendarTask } from "./TaskCard";
 import { cn } from "@/lib/utils";
+import { moveTask, deleteTask } from "@/app/(app)/tasks/actions";
 
 export type WeekDay = {
   iso: string; // YYYY-MM-DD
@@ -133,29 +134,23 @@ export function TaskCalendarView({
       return;
     }
 
-    const body: Record<string, unknown> = {};
+    const input: Parameters<typeof moveTask>[0] = { taskId: payload.taskId };
     if (payload.frequency === "WEEKLY") {
-      body.moveFromDay = payload.fromDayOfWeek;
-      body.moveToDay = day.dayOfWeek;
+      input.moveFromDay = payload.fromDayOfWeek;
+      input.moveToDay = day.dayOfWeek;
     } else if (payload.frequency === "ONE_TIME") {
-      body.scheduledAt = day.iso;
+      input.scheduledAt = day.iso;
     }
 
-    const taskId = payload.taskId;
     setDrag(null);
 
     startTransition(async () => {
-      try {
-        const res = await fetch(`/api/tasks/${taskId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!res.ok) throw new Error(await res.text());
+      const res = await moveTask(input);
+      if ("error" in res) {
+        toast.error(res.error);
+      } else {
         toast.success("Task moved");
         router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to move task");
       }
     });
   }
@@ -181,13 +176,12 @@ export function TaskCalendarView({
     setDrag(null);
 
     startTransition(async () => {
-      try {
-        const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-        if (!res.ok) throw new Error(await res.text());
+      const res = await deleteTask(taskId);
+      if ("error" in res) {
+        toast.error(res.error);
+      } else {
         toast.success("Task deleted");
         router.refresh();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to delete task");
       }
     });
   }
