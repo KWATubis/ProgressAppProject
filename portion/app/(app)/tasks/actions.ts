@@ -6,6 +6,21 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { parseISODate } from "@/lib/utils/dates";
 
+/**
+ * Squeeze a Prisma (or generic) error into a single readable line for a toast.
+ * PrismaClientValidationError.message starts with a newline and a multi-line
+ * code block; passing it raw to sonner shows an empty-looking toast.
+ */
+function prettyError(e: unknown, fallback: string): string {
+  if (!(e instanceof Error)) return fallback;
+  const lines = e.message.split("\n").map((l) => l.trim()).filter(Boolean);
+  // Prisma puts the human-readable cause on the last line ("Unknown argument
+  // `foo`. ..."); fall through to the first non-empty line otherwise.
+  const last = lines[lines.length - 1];
+  if (last && /^[A-Z]/.test(last) && !last.startsWith("Invalid")) return last;
+  return lines[0] || fallback;
+}
+
 const moveSchema = z.object({
   taskId: z.string().min(1),
   moveFromDay: z.number().int().min(0).max(6).optional(),
@@ -66,7 +81,7 @@ export async function moveTask(input: MoveTaskInput): Promise<ActionResult> {
   try {
     await prisma.task.update({ where: { id: data.taskId }, data: updates });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to move task." };
+    return { error: prettyError(e, "Failed to move task.") };
   }
 
   revalidatePath("/tasks");
@@ -115,7 +130,7 @@ export async function skipTaskForDate(
       update: { status: "SKIPPED" },
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to skip task." };
+    return { error: prettyError(e, "Failed to skip task.") };
   }
 
   revalidatePath("/tasks");
@@ -171,7 +186,7 @@ export async function updateTask(
   try {
     await prisma.task.update({ where: { id: taskId }, data });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to update task." };
+    return { error: prettyError(e, "Failed to update task.") };
   }
 
   revalidatePath("/tasks");
@@ -228,7 +243,7 @@ export async function reorderTasksForDate(
       ),
     );
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to reorder." };
+    return { error: prettyError(e, "Failed to reorder.") };
   }
 
   revalidatePath("/tasks");
@@ -250,7 +265,7 @@ export async function deleteTask(taskId: string): Promise<ActionResult> {
       where: { id: taskId, profileId: user.id },
     });
   } catch (e) {
-    return { error: e instanceof Error ? e.message : "Failed to delete task." };
+    return { error: prettyError(e, "Failed to delete task.") };
   }
   if (result.count === 0) return { error: "Task not found." };
 

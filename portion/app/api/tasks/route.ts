@@ -43,24 +43,36 @@ export async function POST(req: Request) {
     }
   }
 
-  const task = await prisma.task.create({
-    data: {
-      profileId: user.id,
-      pillar: body.pillar,
-      title: body.title,
-      description: body.description ?? null,
-      frequency: body.frequency,
-      dayOfWeek: body.frequency === "WEEKLY" ? body.dayOfWeek : [],
-      scheduledAt:
-        body.frequency === "ONE_TIME" && body.scheduledAt
-          ? parseISODate(body.scheduledAt)
-          : null,
-      durationMin: body.durationMin ?? null,
-      startMinute: body.startMinute ?? null,
-      goalId: body.goalId ?? null,
-      isAiGenerated: false,
-    },
-  });
+  let task;
+  try {
+    task = await prisma.task.create({
+      data: {
+        profileId: user.id,
+        pillar: body.pillar,
+        title: body.title,
+        description: body.description ?? null,
+        frequency: body.frequency,
+        dayOfWeek: body.frequency === "WEEKLY" ? body.dayOfWeek : [],
+        scheduledAt:
+          body.frequency === "ONE_TIME" && body.scheduledAt
+            ? parseISODate(body.scheduledAt)
+            : null,
+        durationMin: body.durationMin ?? null,
+        startMinute: body.startMinute ?? null,
+        goalId: body.goalId ?? null,
+        isAiGenerated: false,
+      },
+    });
+  } catch (e) {
+    // Squash multi-line Prisma errors so the client can show a useful toast
+    // instead of an HTML 500 page or empty error.
+    const raw = e instanceof Error ? e.message : "Failed to create task.";
+    const line = raw.split("\n").map((l) => l.trim()).filter(Boolean).pop();
+    return NextResponse.json(
+      { error: line ?? "Failed to create task." },
+      { status: 400 },
+    );
+  }
 
   return NextResponse.json({ task });
 }

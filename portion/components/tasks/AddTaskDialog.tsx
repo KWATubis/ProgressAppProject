@@ -158,7 +158,16 @@ export function AddTaskDialog({
             startMinute: parsedStart,
           }),
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          let msg = "Failed to create task";
+          try {
+            const data = (await res.json()) as { error?: string };
+            if (data.error) msg = data.error;
+          } catch {
+            // non-JSON body (e.g. HTML 500 page) — keep the generic message
+          }
+          throw new Error(msg);
+        }
         toast.success("Task added");
         resetCreate();
         setOpen(false);
