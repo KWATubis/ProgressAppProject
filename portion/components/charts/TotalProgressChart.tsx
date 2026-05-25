@@ -34,7 +34,7 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
   // early-game scores still have visible movement.
   const latest = formatted[formatted.length - 1]?.score ?? 1;
   const peak = Math.max(...formatted.map((d) => d.score), latest);
-  const yMaxRaw = Math.max(latest * 3, peak * 1.1, 3);
+  const yMaxRaw = Math.max(latest * 1.5, 3);
   const niceCeil = (n: number) => {
     if (n <= 3) return 3;
     if (n <= 6) return 6;

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { TaskCard, type CalendarTask } from "./TaskCard";
 import { cn } from "@/lib/utils";
@@ -87,6 +87,7 @@ export function TaskCalendarView({
     };
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData(DRAG_MIME, JSON.stringify(payload));
+    e.dataTransfer.setData("text/plain", JSON.stringify(payload));
     setDrag(payload);
   }
 
@@ -96,40 +97,51 @@ export function TaskCalendarView({
   }
 
   function handleDayDragOver(e: React.DragEvent<HTMLDivElement>, day: WeekDay) {
-    if (!drag) return;
-    if (day.iso === drag.fromIso) return;
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
+    if (drag?.fromIso === day.iso) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDropHover(day.iso);
   }
 
-  function handleDayDragLeave(day: WeekDay) {
+  function handleDayDragLeave(e: React.DragEvent<HTMLDivElement>, day: WeekDay) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setDropHover((h) => (h === day.iso ? null : h));
+  }
+
+  function parseDragPayload(e: React.DragEvent): DragPayload | null {
+    try {
+      const raw = e.dataTransfer.getData(DRAG_MIME) || e.dataTransfer.getData("text/plain");
+      return raw ? (JSON.parse(raw) as DragPayload) : drag;
+    } catch {
+      return drag;
+    }
   }
 
   function handleDayDrop(e: React.DragEvent<HTMLDivElement>, day: WeekDay) {
     e.preventDefault();
     setDropHover(null);
-    if (!drag || day.iso === drag.fromIso) {
+    const payload = parseDragPayload(e);
+    if (!payload || day.iso === payload.fromIso) {
       setDrag(null);
       return;
     }
 
-    if (drag.frequency === "DAILY") {
+    if (payload.frequency === "DAILY") {
       toast.info("Daily tasks run every day — nothing to move.");
       setDrag(null);
       return;
     }
 
     const body: Record<string, unknown> = {};
-    if (drag.frequency === "WEEKLY") {
-      body.moveFromDay = drag.fromDayOfWeek;
+    if (payload.frequency === "WEEKLY") {
+      body.moveFromDay = payload.fromDayOfWeek;
       body.moveToDay = day.dayOfWeek;
-    } else if (drag.frequency === "ONE_TIME") {
+    } else if (payload.frequency === "ONE_TIME") {
       body.scheduledAt = day.iso;
     }
 
-    const taskId = drag.taskId;
+    const taskId = payload.taskId;
     setDrag(null);
 
     startTransition(async () => {
@@ -149,21 +161,23 @@ export function TaskCalendarView({
   }
 
   function handleTrashDragOver(e: React.DragEvent<HTMLDivElement>) {
-    if (!drag) return;
+    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDropHover("trash");
   }
 
-  function handleTrashDragLeave() {
+  function handleTrashDragLeave(e: React.DragEvent<HTMLDivElement>) {
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setDropHover((h) => (h === "trash" ? null : h));
   }
 
   function handleTrashDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDropHover(null);
-    if (!drag) return;
-    const taskId = drag.taskId;
+    const payload = parseDragPayload(e);
+    if (!payload) return;
+    const taskId = payload.taskId;
     setDrag(null);
 
     startTransition(async () => {
@@ -222,7 +236,7 @@ export function TaskCalendarView({
             <div
               key={day.iso}
               onDragOver={(e) => handleDayDragOver(e, day)}
-              onDragLeave={() => handleDayDragLeave(day)}
+              onDragLeave={(e) => handleDayDragLeave(e, day)}
               onDrop={(e) => handleDayDrop(e, day)}
               className={cn(
                 "min-h-[180px] rounded-lg border bg-card p-2 transition",
@@ -271,20 +285,26 @@ export function TaskCalendarView({
         })}
       </div>
 
-      {/* Trash zone — only shown while a drag is in progress. */}
-      <div
-        onDragOver={handleTrashDragOver}
-        onDragLeave={handleTrashDragLeave}
-        onDrop={handleTrashDrop}
-        className={cn(
-          "flex items-center justify-center gap-2 rounded-lg border border-dashed border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive transition-all",
-          drag ? "opacity-100" : "pointer-events-none h-0 -m-1 opacity-0 overflow-hidden border-0 p-0",
-          dropHover === "trash" && "border-destructive/80 bg-destructive/15 ring-1 ring-destructive/40",
-        )}
-      >
-        <Trash2 className="h-4 w-4" />
-        Drop here to delete
-      </div>
+      {/* Floating trash zone — fixed at bottom-centre while a drag is active */}
+      {drag && (
+        <div
+          onDragOver={handleTrashDragOver}
+          onDragLeave={handleTrashDragLeave}
+          onDrop={handleTrashDrop}
+          className={cn(
+            "fixed bottom-8 left-1/2 z-50 -translate-x-1/2",
+            "flex items-center gap-3 rounded-2xl border-2 border-dashed px-8 py-4",
+            "bg-card/90 backdrop-blur-sm shadow-2xl",
+            "transition-all duration-150 select-none",
+            dropHover === "trash"
+              ? "scale-110 border-destructive bg-destructive/20 text-destructive shadow-destructive/20"
+              : "border-destructive/50 text-destructive/70",
+          )}
+        >
+          <span className="text-3xl leading-none">🗑️</span>
+          <span className="text-sm font-medium">Drop to delete</span>
+        </div>
+      )}
 
       {pending && (
         <div className="text-xs text-muted-foreground">Saving…</div>
