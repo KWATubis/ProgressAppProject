@@ -13,6 +13,7 @@ const createSchema = z.object({
   description: z.string().max(500).optional().nullable(),
   goalId: z.string().optional().nullable(),
   durationMin: z.number().int().min(1).max(24 * 60).optional().nullable(),
+  startMinute: z.number().int().min(0).max(24 * 60 - 1).optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
           ? parseISODate(body.scheduledAt)
           : null,
       durationMin: body.durationMin ?? null,
+      startMinute: body.startMinute ?? null,
       goalId: body.goalId ?? null,
       isAiGenerated: false,
     },

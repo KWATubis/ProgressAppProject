@@ -2,15 +2,15 @@
 
 import { useOptimistic, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Dumbbell, Pencil, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { TaskCard, formatDuration, type CalendarTask } from "./TaskCard";
+import { AddTaskDialog, type TaskEditorTask } from "./AddTaskDialog";
 import { cn } from "@/lib/utils";
 import {
   moveTask,
   deleteTask,
   skipTaskForDate,
-  reorderTasksForDate,
 } from "@/app/(app)/tasks/actions";
 import {
   Dialog,
@@ -21,6 +21,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+
+const START_HOUR = 5;
+const END_HOUR = 24;
+const PX_PER_HOUR = 50;
+const TIMELINE_HEIGHT_PX = (END_HOUR - START_HOUR) * PX_PER_HOUR;
+const MIN_TASK_HEIGHT_PX = 26;
+
+function timeLabel(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function taskTopPx(startMin: number): number {
+  return Math.max(0, ((startMin - START_HOUR * 60) / 60) * PX_PER_HOUR);
+}
+
+function taskHeightPx(durationMin: number | null): number {
+  const dur = durationMin ?? 30;
+  return Math.max((dur / 60) * PX_PER_HOUR, MIN_TASK_HEIGHT_PX);
+}
 
 export type WeekDay = {
   iso: string; // YYYY-MM-DD
@@ -41,8 +62,7 @@ type DragPayload = {
 type OptimisticOp =
   | { kind: "delete"; taskId: string }
   | { kind: "skip"; taskId: string; iso: string }
-  | { kind: "move"; taskId: string; fromIso: string; toIso: string }
-  | { kind: "reorder"; taskId: string; iso: string; beforeTaskId: string | null };
+  | { kind: "move"; taskId: string; fromIso: string; toIso: string };
 
 type ConfirmDelete = {
   taskId: string;
@@ -65,20 +85,6 @@ function applyOptimisticOp(state: WeekDay[], op: OptimisticOp): WeekDay[] {
     return state.map((d) =>
       d.iso !== op.iso ? d : { ...d, tasks: d.tasks.filter((t) => t.id !== op.taskId) },
     );
-  }
-  if (op.kind === "reorder") {
-    return state.map((d) => {
-      if (d.iso !== op.iso) return d;
-      const fromIdx = d.tasks.findIndex((t) => t.id === op.taskId);
-      if (fromIdx < 0) return d;
-      const without = d.tasks.filter((_, i) => i !== fromIdx);
-      const insertAt = op.beforeTaskId
-        ? without.findIndex((t) => t.id === op.beforeTaskId)
-        : without.length;
-      const tasks = [...without];
-      tasks.splice(insertAt < 0 ? tasks.length : insertAt, 0, d.tasks[fromIdx]);
-      return { ...d, tasks };
-    });
   }
   // move: pluck the task off the source day, attach to the target day.
   let plucked: CalendarTask | undefined;
@@ -116,9 +122,22 @@ export function TaskCalendarView({
   const [statusOverrides, setStatusOverrides] = useState<Record<string, CalendarTask["status"]>>({});
   const [drag, setDrag] = useState<DragPayload | null>(null);
   const [dropHover, setDropHover] = useState<string | null>(null); // ISO of day being hovered or "trash"
-  const [reorderHover, setReorderHover] = useState<string | null>(null); // taskId being hovered as reorder target
   const [confirmDelete, setConfirmDelete] = useState<ConfirmDelete | null>(null);
+  const [editing, setEditing] = useState<TaskEditorTask | null>(null);
   const [optimisticDays, applyOp] = useOptimistic(days, applyOptimisticOp);
+
+  function openEditor(task: CalendarTask) {
+    setEditing({
+      id: task.id,
+      title: task.title,
+      pillar: task.pillar,
+      frequency: task.frequency,
+      dayOfWeek: task.dayOfWeek,
+      scheduledAt: task.scheduledAt,
+      durationMin: task.durationMin,
+      startMinute: task.startMinute,
+    });
+  }
 
   function statusKey(dateISO: string, taskId: string) {
     return `${dateISO}::${taskId}`;
@@ -183,66 +202,6 @@ export function TaskCalendarView({
   function handleDayDragLeave(e: React.DragEvent<HTMLDivElement>, day: WeekDay) {
     if (e.currentTarget.contains(e.relatedTarget as Node)) return;
     setDropHover((h) => (h === day.iso ? null : h));
-  }
-
-  function handleCardDragOver(
-    e: React.DragEvent<HTMLDivElement>,
-    day: WeekDay,
-    card: CalendarTask,
-  ) {
-    if (!e.dataTransfer.types.includes(DRAG_MIME)) return;
-    if (drag?.fromIso !== day.iso) return; // cross-day drag → let day column handle
-    if (drag?.taskId === card.id) return;
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = "move";
-    setReorderHover(card.id);
-  }
-
-  function handleCardDragLeave(
-    e: React.DragEvent<HTMLDivElement>,
-    card: CalendarTask,
-  ) {
-    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-    setReorderHover((h) => (h === card.id ? null : h));
-  }
-
-  function handleCardDrop(
-    e: React.DragEvent<HTMLDivElement>,
-    day: WeekDay,
-    card: CalendarTask,
-  ) {
-    const payload = parseDragPayload(e);
-    if (!payload || payload.fromIso !== day.iso || payload.taskId === card.id) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setReorderHover(null);
-    setDrag(null);
-
-    // Compute the new ordered list from what the user actually sees so the
-    // server's stored order matches the optimistic UI.
-    const visibleDay = optimisticDays.find((d) => d.iso === day.iso);
-    if (!visibleDay) return;
-    const fromIdx = visibleDay.tasks.findIndex((t) => t.id === payload.taskId);
-    if (fromIdx < 0) return;
-    const moved = visibleDay.tasks[fromIdx];
-    const without = visibleDay.tasks.filter((_, i) => i !== fromIdx);
-    const beforeIdx = without.findIndex((t) => t.id === card.id);
-    const newOrder = [...without];
-    newOrder.splice(beforeIdx < 0 ? newOrder.length : beforeIdx, 0, moved);
-
-    startTransition(async () => {
-      applyOp({ kind: "reorder", taskId: payload.taskId, iso: day.iso, beforeTaskId: card.id });
-      const res = await reorderTasksForDate({
-        date: day.iso,
-        orderedTaskIds: newOrder.map((t) => t.id),
-      });
-      if ("error" in res) {
-        toast.error(res.error);
-      } else {
-        router.refresh();
-      }
-    });
   }
 
   function parseDragPayload(e: React.DragEvent): DragPayload | null {
@@ -356,7 +315,7 @@ export function TaskCalendarView({
         <div>
           <h2 className="text-sm font-semibold">{weekLabel}</h2>
           <p className="text-xs text-muted-foreground">
-            Click to toggle. Drag onto another day to move it, onto another task in the same day to reorder, or drop on the trash to delete.
+            Click to toggle, double-click (or use the pencil) to edit. Drag onto another day to move it, or onto the trash to delete.
           </p>
         </div>
         <div className="flex items-center gap-1">
@@ -386,24 +345,23 @@ export function TaskCalendarView({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-7">
+      {/* Day headers */}
+      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-1">
+        <div />
         {optimisticDays.map((day) => {
-          const isHover = dropHover === day.iso;
-          const isSource = drag?.fromIso === day.iso;
+          const totalMin = day.tasks.reduce(
+            (sum, t) => sum + (t.durationMin ?? 0),
+            0,
+          );
           return (
             <div
-              key={day.iso}
-              onDragOver={(e) => handleDayDragOver(e, day)}
-              onDragLeave={(e) => handleDayDragLeave(e, day)}
-              onDrop={(e) => handleDayDrop(e, day)}
+              key={`h-${day.iso}`}
               className={cn(
-                "min-h-[180px] rounded-lg border bg-card p-2 transition",
+                "flex flex-col gap-0.5 rounded-md border bg-card px-2 py-1.5",
                 day.isToday && "border-foreground/40 ring-1 ring-foreground/10",
-                isHover && "border-emerald-400/70 bg-emerald-400/5 ring-1 ring-emerald-400/40",
-                drag && !isSource && !isHover && "border-dashed",
               )}
             >
-              <div className="mb-2 flex items-baseline justify-between px-1">
+              <div className="flex items-baseline justify-between">
                 <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {day.label}
                 </div>
@@ -416,44 +374,187 @@ export function TaskCalendarView({
                   {day.dayNum}
                 </div>
               </div>
-              <div className="space-y-1.5">
-                {day.tasks.length === 0 ? (
-                  <div className="px-1 py-2 text-[11px] text-muted-foreground/60">No tasks</div>
-                ) : (
-                  day.tasks.map((t) => {
+              {totalMin > 0 && (
+                <div className="text-[9px] tabular-nums text-muted-foreground/70">
+                  {formatDuration(totalMin)}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Timeline: time axis + 7 day columns */}
+      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-1">
+        {/* Hour labels */}
+        <div className="relative" style={{ height: TIMELINE_HEIGHT_PX }}>
+          {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => (
+            <div
+              key={i}
+              className="absolute right-1 -translate-y-1/2 text-[10px] tabular-nums text-muted-foreground/70"
+              style={{ top: i * PX_PER_HOUR }}
+            >
+              {String(START_HOUR + i).padStart(2, "0")}:00
+            </div>
+          ))}
+        </div>
+
+        {/* Day columns */}
+        {optimisticDays.map((day) => {
+          const isHover = dropHover === day.iso;
+          const isSource = drag?.fromIso === day.iso;
+          const timedTasks = day.tasks.filter((t) => t.startMinute != null);
+          return (
+            <div
+              key={day.iso}
+              onDragOver={(e) => handleDayDragOver(e, day)}
+              onDragLeave={(e) => handleDayDragLeave(e, day)}
+              onDrop={(e) => handleDayDrop(e, day)}
+              className={cn(
+                "relative rounded-md border bg-card transition",
+                day.isToday && "border-foreground/40 ring-1 ring-foreground/10",
+                isHover && "border-emerald-400/70 bg-emerald-400/5 ring-1 ring-emerald-400/40",
+                drag && !isSource && !isHover && "border-dashed",
+              )}
+              style={{ height: TIMELINE_HEIGHT_PX }}
+            >
+              {/* Hour grid lines */}
+              {Array.from({ length: END_HOUR - START_HOUR }, (_, i) => (
+                <div
+                  key={i}
+                  className="pointer-events-none absolute inset-x-0 border-t border-foreground/5"
+                  style={{ top: (i + 1) * PX_PER_HOUR }}
+                />
+              ))}
+              {/* Timed tasks */}
+              {timedTasks.map((t) => {
+                const key = statusKey(day.iso, t.id);
+                const status = statusOverrides[key] ?? t.status;
+                const done = status === "COMPLETE";
+                const beingDragged =
+                  drag?.taskId === t.id && drag?.fromIso === day.iso;
+                const Icon = t.pillar === "HEALTH" ? Dumbbell : TrendingUp;
+                const accent =
+                  t.pillar === "HEALTH"
+                    ? "border-emerald-300/50 bg-emerald-50/95 text-emerald-900 dark:border-emerald-700/40 dark:bg-emerald-900/40 dark:text-emerald-100"
+                    : "border-amber-300/50 bg-amber-50/95 text-amber-900 dark:border-amber-700/40 dark:bg-amber-900/40 dark:text-amber-100";
+                const endMin = t.startMinute! + (t.durationMin ?? 0);
+                return (
+                  <div
+                    key={`${day.iso}-${t.id}`}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, t, day)}
+                    onDragEnd={handleDragEnd}
+                    onDoubleClick={() => openEditor(t)}
+                    style={{
+                      top: taskTopPx(t.startMinute!),
+                      height: taskHeightPx(t.durationMin),
+                    }}
+                    className={cn(
+                      "group absolute inset-x-0.5 flex cursor-grab flex-col gap-0.5 overflow-hidden rounded-md border px-1.5 py-1 text-[11px] shadow-sm active:cursor-grabbing",
+                      accent,
+                      done && "opacity-60",
+                      beingDragged && "opacity-30",
+                    )}
+                  >
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggle(day.iso, t);
+                        }}
+                        className={cn(
+                          "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition",
+                          done
+                            ? "border-current bg-current/80"
+                            : "border-current/40 hover:border-current",
+                        )}
+                        aria-label={done ? "Mark incomplete" : "Mark complete"}
+                      >
+                        {done && (
+                          <Check className="h-2.5 w-2.5 text-background" strokeWidth={3} />
+                        )}
+                      </button>
+                      <span
+                        className={cn(
+                          "min-w-0 flex-1 truncate font-medium",
+                          done && "line-through",
+                        )}
+                      >
+                        {t.title}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditor(t);
+                        }}
+                        className="shrink-0 opacity-0 transition group-hover:opacity-80 hover:opacity-100"
+                        aria-label="Edit task"
+                      >
+                        <Pencil className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                    {taskHeightPx(t.durationMin) >= 36 && (
+                      <div className="flex items-center gap-1 text-[9px] tabular-nums opacity-70">
+                        <Icon className="h-2.5 w-2.5" />
+                        {timeLabel(t.startMinute!)}
+                        {t.durationMin != null && <> – {timeLabel(endMin)}</>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Unscheduled tray */}
+      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-1">
+        <div className="text-right text-[9px] uppercase tracking-wider text-muted-foreground/70">
+          unscheduled
+        </div>
+        {optimisticDays.map((day) => {
+          const untimed = day.tasks.filter((t) => t.startMinute == null);
+          const isHover = dropHover === day.iso;
+          const isSource = drag?.fromIso === day.iso;
+          return (
+            <div
+              key={`u-${day.iso}`}
+              onDragOver={(e) => handleDayDragOver(e, day)}
+              onDragLeave={(e) => handleDayDragLeave(e, day)}
+              onDrop={(e) => handleDayDrop(e, day)}
+              className={cn(
+                "min-h-[60px] rounded-md border bg-card/40 p-1 transition",
+                isHover && "border-emerald-400/70 bg-emerald-400/5 ring-1 ring-emerald-400/40",
+                drag && !isSource && !isHover && "border-dashed",
+              )}
+            >
+              {untimed.length === 0 ? (
+                <div className="px-1 py-1 text-[10px] text-muted-foreground/40">—</div>
+              ) : (
+                <div className="space-y-1">
+                  {untimed.map((t) => {
                     const key = statusKey(day.iso, t.id);
                     const effective = { ...t, status: statusOverrides[key] ?? t.status };
                     const beingDragged =
                       drag?.taskId === t.id && drag?.fromIso === day.iso;
                     return (
                       <TaskCard
-                        key={`${day.iso}-${t.id}`}
+                        key={`u-${day.iso}-${t.id}`}
                         task={effective}
                         onToggle={() => toggle(day.iso, t)}
                         onDragStart={(e) => handleDragStart(e, t, day)}
                         onDragEnd={handleDragEnd}
-                        onDragOver={(e) => handleCardDragOver(e, day, t)}
-                        onDragLeave={(e) => handleCardDragLeave(e, t)}
-                        onDrop={(e) => handleCardDrop(e, day, t)}
+                        onEdit={() => openEditor(t)}
                         isDragging={beingDragged}
-                        isReorderTarget={reorderHover === t.id}
                       />
                     );
-                  })
-                )}
-              </div>
-              {(() => {
-                const total = day.tasks.reduce(
-                  (sum, t) => sum + (t.durationMin ?? 0),
-                  0,
-                );
-                if (total === 0) return null;
-                return (
-                  <div className="mt-2 border-t border-foreground/5 px-1 pt-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70">
-                    Total {formatDuration(total)}
-                  </div>
-                );
-              })()}
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -483,6 +584,14 @@ export function TaskCalendarView({
       {pending && (
         <div className="text-xs text-muted-foreground">Saving…</div>
       )}
+
+      <AddTaskDialog
+        task={editing ?? undefined}
+        open={!!editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
 
       <Dialog
         open={!!confirmDelete}

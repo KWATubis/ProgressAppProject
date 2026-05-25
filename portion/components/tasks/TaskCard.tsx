@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Dumbbell, GripVertical, TrendingUp } from "lucide-react";
+import { Check, Clock, Dumbbell, GripVertical, Pencil, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type CalendarTask = {
@@ -10,6 +10,9 @@ export type CalendarTask = {
   frequency: "DAILY" | "WEEKLY" | "ONE_TIME";
   status: "PENDING" | "COMPLETE" | "SKIPPED";
   durationMin: number | null;
+  startMinute: number | null;
+  dayOfWeek: number[];
+  scheduledAt: string | null;
 };
 
 const FREQ_LABEL: Record<CalendarTask["frequency"], string> = {
@@ -28,6 +31,7 @@ export function formatDuration(min: number): string {
 export function TaskCard({
   task,
   onToggle,
+  onEdit,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -39,6 +43,7 @@ export function TaskCard({
 }: {
   task: CalendarTask;
   onToggle: () => void;
+  onEdit?: () => void;
   onDragStart?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragEnd?: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragOver?: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -63,6 +68,7 @@ export function TaskCard({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      onDoubleClick={onEdit}
       className={cn(
         "group relative flex w-full items-start gap-1.5 rounded-md border px-1.5 py-1.5 text-left text-xs transition hover:shadow-sm",
         accent,
@@ -110,6 +116,19 @@ export function TaskCard({
           )}
         </span>
       </button>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          className="shrink-0 self-start p-0.5 opacity-0 transition group-hover:opacity-70 hover:opacity-100"
+          aria-label="Edit task"
+        >
+          <Pencil className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }

@@ -124,6 +124,61 @@ export async function skipTaskForDate(
   return { ok: true };
 }
 
+const updateSchema = z.object({
+  taskId: z.string().min(1),
+  title: z.string().min(1).max(120).optional(),
+  pillar: z.enum(["HEALTH", "MONEY"]).optional(),
+  frequency: z.enum(["DAILY", "WEEKLY", "ONE_TIME"]).optional(),
+  dayOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
+  scheduledAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  durationMin: z.number().int().min(1).max(24 * 60).nullable().optional(),
+  startMinute: z.number().int().min(0).max(24 * 60 - 1).nullable().optional(),
+});
+
+export async function updateTask(
+  input: z.infer<typeof updateSchema>,
+): Promise<ActionResult> {
+  let user;
+  try {
+    user = await requireUser();
+  } catch {
+    return { error: "Not authenticated." };
+  }
+
+  const parsed = updateSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { taskId, ...rest } = parsed.data;
+
+  const owned = await prisma.task.findFirst({
+    where: { id: taskId, profileId: user.id },
+    select: { id: true },
+  });
+  if (!owned) return { error: "Task not found." };
+
+  const data: Record<string, unknown> = {};
+  if (rest.title !== undefined) data.title = rest.title;
+  if (rest.pillar !== undefined) data.pillar = rest.pillar;
+  if (rest.frequency !== undefined) data.frequency = rest.frequency;
+  if (rest.dayOfWeek !== undefined) data.dayOfWeek = rest.dayOfWeek;
+  if (rest.scheduledAt !== undefined) {
+    data.scheduledAt = rest.scheduledAt ? parseISODate(rest.scheduledAt) : null;
+  }
+  if (rest.durationMin !== undefined) data.durationMin = rest.durationMin;
+  if (rest.startMinute !== undefined) data.startMinute = rest.startMinute;
+
+  try {
+    await prisma.task.update({ where: { id: taskId }, data });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Failed to update task." };
+  }
+
+  revalidatePath("/tasks");
+  revalidatePath("/dashboard");
+  return { ok: true };
+}
+
 const reorderSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   orderedTaskIds: z.array(z.string().min(1)).min(1),

@@ -75,6 +75,9 @@ export default async function TasksPage({
         frequency: t.frequency,
         status: logIndex.get(logKey(t.id, d)) ?? "PENDING",
         durationMin: t.durationMin,
+        startMinute: t.startMinute,
+        dayOfWeek: t.dayOfWeek,
+        scheduledAt: t.scheduledAt ? formatISODate(t.scheduledAt) : null,
       }))
       // SKIPPED tasks are hidden for that specific day. The recurring task
       // itself stays untouched and shows on its other scheduled days.

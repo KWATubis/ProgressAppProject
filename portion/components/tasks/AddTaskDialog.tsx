@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -17,31 +17,90 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { updateTask } from "@/app/(app)/tasks/actions";
 
 type Frequency = "DAILY" | "WEEKLY" | "ONE_TIME";
 type Pillar = "HEALTH" | "MONEY";
 
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"];
 
-export function AddTaskDialog() {
+function minutesToTimeStr(min: number | null | undefined): string {
+  if (min == null) return "";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function timeStrToMinutes(s: string): number | null {
+  if (!s) return null;
+  const [h, m] = s.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+export type TaskEditorTask = {
+  id: string;
+  title: string;
+  pillar: Pillar;
+  frequency: Frequency;
+  dayOfWeek: number[];
+  scheduledAt: string | null; // YYYY-MM-DD
+  durationMin: number | null;
+  startMinute: number | null;
+};
+
+/**
+ * Add-task button + dialog. When `task` is omitted, opens in create mode and
+ * renders an "Add task" trigger button. When `task` is provided, opens in edit
+ * mode and lets the parent control visibility via `open` / `onOpenChange`.
+ */
+export function AddTaskDialog({
+  task,
+  open: openProp,
+  onOpenChange,
+}: {
+  task?: TaskEditorTask;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+} = {}) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = openProp ?? internalOpen;
+  const setOpen = onOpenChange ?? setInternalOpen;
   const [pending, startTransition] = useTransition();
 
-  const [title, setTitle] = useState("");
-  const [pillar, setPillar] = useState<Pillar>("HEALTH");
-  const [frequency, setFrequency] = useState<Frequency>("DAILY");
-  const [dayOfWeek, setDayOfWeek] = useState<number[]>([]);
-  const [scheduledAt, setScheduledAt] = useState<string>("");
-  const [durationMin, setDurationMin] = useState<string>("");
+  const editing = !!task;
 
-  function reset() {
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [pillar, setPillar] = useState<Pillar>(task?.pillar ?? "HEALTH");
+  const [frequency, setFrequency] = useState<Frequency>(task?.frequency ?? "DAILY");
+  const [dayOfWeek, setDayOfWeek] = useState<number[]>(task?.dayOfWeek ?? []);
+  const [scheduledAt, setScheduledAt] = useState<string>(task?.scheduledAt ?? "");
+  const [durationMin, setDurationMin] = useState<string>(
+    task?.durationMin != null ? String(task.durationMin) : "",
+  );
+  const [startTime, setStartTime] = useState<string>(minutesToTimeStr(task?.startMinute));
+
+  // Re-sync form state whenever we open in edit mode with a different task.
+  useEffect(() => {
+    if (!open) return;
+    setTitle(task?.title ?? "");
+    setPillar(task?.pillar ?? "HEALTH");
+    setFrequency(task?.frequency ?? "DAILY");
+    setDayOfWeek(task?.dayOfWeek ?? []);
+    setScheduledAt(task?.scheduledAt ?? "");
+    setDurationMin(task?.durationMin != null ? String(task.durationMin) : "");
+    setStartTime(minutesToTimeStr(task?.startMinute));
+  }, [open, task]);
+
+  function resetCreate() {
     setTitle("");
     setPillar("HEALTH");
     setFrequency("DAILY");
     setDayOfWeek([]);
     setScheduledAt("");
     setDurationMin("");
+    setStartTime("");
   }
 
   function submit() {
@@ -58,6 +117,32 @@ export function AddTaskDialog() {
       return;
     }
 
+    const parsedDuration = durationMin.trim() ? Number(durationMin) : null;
+    const parsedStart = timeStrToMinutes(startTime);
+
+    if (editing && task) {
+      startTransition(async () => {
+        const res = await updateTask({
+          taskId: task.id,
+          title: title.trim(),
+          pillar,
+          frequency,
+          dayOfWeek: frequency === "WEEKLY" ? dayOfWeek : [],
+          scheduledAt: frequency === "ONE_TIME" ? scheduledAt : null,
+          durationMin: parsedDuration,
+          startMinute: parsedStart,
+        });
+        if ("error" in res) {
+          toast.error(res.error);
+        } else {
+          toast.success("Task updated");
+          setOpen(false);
+          router.refresh();
+        }
+      });
+      return;
+    }
+
     startTransition(async () => {
       try {
         const res = await fetch("/api/tasks", {
@@ -69,12 +154,13 @@ export function AddTaskDialog() {
             frequency,
             dayOfWeek: frequency === "WEEKLY" ? dayOfWeek : [],
             scheduledAt: frequency === "ONE_TIME" ? scheduledAt : null,
-            durationMin: durationMin.trim() ? Number(durationMin) : null,
+            durationMin: parsedDuration,
+            startMinute: parsedStart,
           }),
         });
         if (!res.ok) throw new Error(await res.text());
         toast.success("Task added");
-        reset();
+        resetCreate();
         setOpen(false);
         router.refresh();
       } catch (e) {
@@ -85,14 +171,20 @@ export function AddTaskDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button size="sm" className="gap-1.5" />}>
-        <Plus className="h-4 w-4" />
-        Add task
-      </DialogTrigger>
+      {!editing && (
+        <DialogTrigger render={<Button size="sm" className="gap-1.5" />}>
+          <Plus className="h-4 w-4" />
+          Add task
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New task</DialogTitle>
-          <DialogDescription>Add a recurring habit or a one-off task.</DialogDescription>
+          <DialogTitle>{editing ? "Edit task" : "New task"}</DialogTitle>
+          <DialogDescription>
+            {editing
+              ? "Update title, schedule, duration, or start time."
+              : "Add a recurring habit or a one-off task."}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -199,18 +291,29 @@ export function AddTaskDialog() {
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <Label htmlFor="task-duration">Duration (min)</Label>
-            <Input
-              id="task-duration"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={5}
-              value={durationMin}
-              onChange={(e) => setDurationMin(e.target.value)}
-              placeholder="optional, e.g. 30"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="task-start">Start time</Label>
+              <Input
+                id="task-start"
+                type="time"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="task-duration">Duration (min)</Label>
+              <Input
+                id="task-duration"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step={5}
+                value={durationMin}
+                onChange={(e) => setDurationMin(e.target.value)}
+                placeholder="e.g. 30"
+              />
+            </div>
           </div>
         </div>
 
@@ -219,7 +322,7 @@ export function AddTaskDialog() {
             Cancel
           </Button>
           <Button type="button" onClick={submit} disabled={pending}>
-            {pending ? "Adding…" : "Add task"}
+            {pending ? (editing ? "Saving…" : "Adding…") : editing ? "Save" : "Add task"}
           </Button>
         </DialogFooter>
       </DialogContent>

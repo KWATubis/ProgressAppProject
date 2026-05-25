@@ -113,6 +113,7 @@ model Task {
   scheduledAt   DateTime?
   dayOfWeek     Int[]
   durationMin   Int?
+  startMinute   Int?
   isAiGenerated Boolean        @default(false)
   isActive      Boolean        @default(true)
   sortOrder     Int            @default(0)
