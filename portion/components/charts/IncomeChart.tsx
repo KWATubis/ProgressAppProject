@@ -16,9 +16,11 @@ export type IncomeMonth = { month: string; amountPln: number };
 export function IncomeChart({
   data,
   target,
+  color = "#818cf8",
 }: {
   data: IncomeMonth[];
   target?: number | null;
+  color?: string;
 }) {
   if (data.length === 0) {
     return (
@@ -78,7 +80,7 @@ export function IncomeChart({
             }}
           />
         )}
-        <Bar dataKey="amountPln" fill="#818cf8" radius={[3, 3, 0, 0]} maxBarSize={48} />
+        <Bar dataKey="amountPln" fill={color} radius={[3, 3, 0, 0]} maxBarSize={48} />
       </BarChart>
     </ChartFrame>
   );

@@ -12,7 +12,15 @@ import { ChartFrame } from "./ChartFrame";
 
 export type VolumeWeek = { week: string; volumeKg: number };
 
-export function WorkoutVolumeChart({ data }: { data: VolumeWeek[] }) {
+export function WorkoutVolumeChart({
+  data,
+  color = "#34d399",
+  unit = "kg",
+}: {
+  data: VolumeWeek[];
+  color?: string;
+  unit?: string;
+}) {
   if (data.length === 0) {
     return (
       <div className="flex h-48 items-center justify-center text-sm text-muted-foreground">
@@ -44,7 +52,7 @@ export function WorkoutVolumeChart({ data }: { data: VolumeWeek[] }) {
           tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(v) => `${v}kg`}
+          tickFormatter={(v) => `${v}${unit}`}
         />
         <Tooltip
           contentStyle={{
@@ -54,11 +62,11 @@ export function WorkoutVolumeChart({ data }: { data: VolumeWeek[] }) {
             fontSize: 12,
           }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(v: any) => [`${v} kg`, "Volume"]}
+          formatter={(v: any) => [`${v} ${unit}`, "Volume"]}
           labelStyle={{ color: "rgba(255,255,255,0.45)", marginBottom: 2 }}
           cursor={{ fill: "rgba(255,255,255,0.04)" }}
         />
-        <Bar dataKey="volumeKg" fill="#34d399" radius={[3, 3, 0, 0]} maxBarSize={44} />
+        <Bar dataKey="volumeKg" fill={color} radius={[3, 3, 0, 0]} maxBarSize={44} />
       </BarChart>
     </ChartFrame>
   );

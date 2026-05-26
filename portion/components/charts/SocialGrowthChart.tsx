@@ -16,9 +16,11 @@ export type FollowerDataPoint = { date: string; followerCount: number };
 export function SocialGrowthChart({
   data,
   target,
+  color = "#818cf8",
 }: {
   data: FollowerDataPoint[];
   target?: number | null;
+  color?: string;
 }) {
   if (data.length === 0) {
     return (
@@ -83,9 +85,9 @@ export function SocialGrowthChart({
           type="monotone"
           dataKey="followerCount"
           dot={false}
-          stroke="#818cf8"
+          stroke={color}
           strokeWidth={2}
-          activeDot={{ r: 4, fill: "#818cf8", strokeWidth: 0 }}
+          activeDot={{ r: 4, fill: color, strokeWidth: 0 }}
         />
       </LineChart>
     </ChartFrame>
