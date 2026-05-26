@@ -34,6 +34,10 @@ enum ActivityKind {
   STRENGTH
   CARDIO
   SPORT
+  SOCIAL
+  SIDE_INCOME
+  MAIN_INCOME
+  BUSINESS
 }
 
 enum RunTrainingType {
@@ -101,26 +105,30 @@ model Goal {
 }
 
 model Task {
-  id            String         @id @default(cuid())
-  profileId     String
-  profile       Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  goalId        String?
-  goal          Goal?          @relation(fields: [goalId], references: [id], onDelete: SetNull)
-  pillar        Pillar
-  title         String
-  description   String?
-  frequency     TaskFrequency
-  scheduledAt   DateTime?
-  dayOfWeek     Int[]
-  durationMin   Int?
-  startMinute   Int?
-  isAiGenerated Boolean        @default(false)
-  isActive      Boolean        @default(true)
-  sortOrder     Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  taskLogs      TaskLog[]
-  dayOrders     TaskDayOrder[]
+  id             String         @id @default(cuid())
+  profileId      String
+  profile        Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  goalId         String?
+  goal           Goal?          @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  activityTypeId String?
+  activityType   ActivityType?  @relation(fields: [activityTypeId], references: [id], onDelete: SetNull)
+  pillar         Pillar
+  title          String
+  description    String?
+  frequency      TaskFrequency
+  scheduledAt    DateTime?
+  dayOfWeek      Int[]
+  durationMin    Int?
+  startMinute    Int?
+  isAiGenerated  Boolean        @default(false)
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  taskLogs       TaskLog[]
+  dayOrders      TaskDayOrder[]
+
+  @@index([profileId, activityTypeId])
 }
 
 model TaskDayOrder {
@@ -158,13 +166,18 @@ model ActivityType {
   name           String
   slug           String
   icon           String?
+  pillar         Pillar           @default(HEALTH)
   kind           ActivityKind
   workoutPlan    WorkoutPlan?
   sessions       WorkoutSession[]
+  tasks          Task[]
+  incomeEntries  IncomeEntry[]
+  socialMetrics  SocialMetric[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 
   @@unique([profileId, slug])
+  @@index([profileId, pillar])
 }
 
 model WorkoutPlan {
@@ -307,26 +320,33 @@ model BodyMetric {
 }
 
 model SocialMetric {
-  id            String   @id @default(cuid())
-  profileId     String
-  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  platform      String
-  date          DateTime
-  followerCount Int
-  videoCount    Int?
-  notes         String?
-  createdAt     DateTime @default(now())
+  id             String        @id @default(cuid())
+  profileId      String
+  profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  activityTypeId String?
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id], onDelete: SetNull)
+  platform       String
+  date           DateTime
+  followerCount  Int
+  videoCount     Int?
+  notes          String?
+  createdAt      DateTime      @default(now())
 
   @@unique([profileId, platform, date])
+  @@index([profileId, activityTypeId])
 }
 
 model IncomeEntry {
-  id          String   @id @default(cuid())
-  profileId   String
-  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  date        DateTime
-  source      String
-  amountPln   Float
-  description String?
-  createdAt   DateTime @default(now())
+  id             String        @id @default(cuid())
+  profileId      String
+  profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  activityTypeId String?
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id], onDelete: SetNull)
+  date           DateTime
+  source         String
+  amountPln      Float
+  description    String?
+  createdAt      DateTime      @default(now())
+
+  @@index([profileId, activityTypeId])
 }

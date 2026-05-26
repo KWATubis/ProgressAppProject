@@ -3,35 +3,51 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { CreateActivityDialog } from "@/components/health/CreateActivityDialog";
 
-const LINKS = [
-  { href: "/money", label: "Overview", exact: true },
-  { href: "/money/content", label: "Content", exact: false },
-  { href: "/money/income", label: "Income", exact: false },
-];
+type ActivityType = {
+  id: string;
+  name: string;
+  slug: string;
+  icon: string | null;
+  kind: "SOCIAL" | "SIDE_INCOME" | "MAIN_INCOME" | "BUSINESS";
+};
 
-export function MoneySubNav() {
+const STATIC_LINKS_BEFORE = [{ href: "/money", label: "Overview", exact: true }];
+
+export function MoneySubNav({ activityTypes }: { activityTypes: ActivityType[] }) {
   const pathname = usePathname();
+
+  function isActive(href: string, exact: boolean) {
+    return exact ? pathname === href : pathname.startsWith(href);
+  }
+
+  const linkClass = (active: boolean) =>
+    cn(
+      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+      active
+        ? "bg-accent text-accent-foreground"
+        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+    );
 
   return (
     <nav className="mt-3 flex flex-wrap items-center gap-1">
-      {LINKS.map(({ href, label, exact }) => {
-        const active = exact ? pathname === href : pathname.startsWith(href);
+      {STATIC_LINKS_BEFORE.map(({ href, label, exact }) => (
+        <Link key={href} href={href} className={linkClass(isActive(href, exact))}>
+          {label}
+        </Link>
+      ))}
+
+      {activityTypes.map((a) => {
+        const href = `/money/activity/${a.slug}`;
         return (
-          <Link
-            key={href}
-            href={href}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-              active
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            )}
-          >
-            {label}
+          <Link key={a.id} href={href} className={linkClass(pathname.startsWith(href))}>
+            {a.icon ? `${a.icon} ${a.name}` : a.name}
           </Link>
         );
       })}
+
+      <CreateActivityDialog pillar="MONEY" />
     </nav>
   );
 }

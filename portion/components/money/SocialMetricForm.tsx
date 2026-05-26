@@ -6,9 +6,14 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { formatISODate, toUtcMidnight } from "@/lib/utils/dates";
 
-const PLATFORM = "TIKTOK";
+type Props = {
+  /** Platform string sent to the API. Defaults to "TIKTOK" for backward compat. */
+  platform?: string;
+  /** If set, links the metric to this activity (and is validated server-side). */
+  activityTypeId?: string;
+};
 
-export function SocialMetricForm() {
+export function SocialMetricForm({ platform = "TIKTOK", activityTypeId }: Props = {}) {
   const router = useRouter();
   const [date, setDate] = useState(() => formatISODate(toUtcMidnight()));
   const [followers, setFollowers] = useState("");
@@ -22,9 +27,10 @@ export function SocialMetricForm() {
     }
     const payload = {
       date,
-      platform: PLATFORM,
+      platform,
       followerCount: Number(followers),
       videoCount: videos === "" ? null : Number(videos),
+      activityTypeId: activityTypeId ?? null,
     };
     startTransition(async () => {
       try {

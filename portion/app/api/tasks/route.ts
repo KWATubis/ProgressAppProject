@@ -12,6 +12,7 @@ const createSchema = z.object({
   scheduledAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   description: z.string().max(500).optional().nullable(),
   goalId: z.string().optional().nullable(),
+  activityTypeId: z.string().optional().nullable(),
   durationMin: z.number().int().min(1).max(24 * 60).optional().nullable(),
   startMinute: z.number().int().min(0).max(24 * 60 - 1).optional().nullable(),
 });
@@ -43,6 +44,16 @@ export async function POST(req: Request) {
     }
   }
 
+  if (body.activityTypeId) {
+    const activity = await prisma.activityType.findUnique({
+      where: { id: body.activityTypeId },
+      select: { profileId: true, pillar: true },
+    });
+    if (!activity || activity.profileId !== user.id || activity.pillar !== body.pillar) {
+      return NextResponse.json({ error: "Activity not found" }, { status: 404 });
+    }
+  }
+
   let task;
   try {
     task = await prisma.task.create({
@@ -60,6 +71,7 @@ export async function POST(req: Request) {
         durationMin: body.durationMin ?? null,
         startMinute: body.startMinute ?? null,
         goalId: body.goalId ?? null,
+        activityTypeId: body.activityTypeId ?? null,
         isAiGenerated: false,
       },
     });

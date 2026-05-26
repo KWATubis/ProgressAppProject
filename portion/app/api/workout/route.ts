@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { parseISODate } from "@/lib/utils/dates";
+import { autoTickActivityTask } from "@/lib/tasks/auto-tick";
 
 const setSchema = z.object({
   setNumber: z.number().int().min(1),
@@ -132,6 +133,14 @@ export async function POST(req: Request) {
     },
     include: { exercises: true, runs: true },
   });
+
+  if (session.activityTypeId) {
+    await autoTickActivityTask({
+      profileId: user.id,
+      activityTypeId: session.activityTypeId,
+      date: session.date,
+    });
+  }
 
   return NextResponse.json({ session });
 }

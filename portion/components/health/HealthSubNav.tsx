@@ -51,7 +51,7 @@ export function HealthSubNav({ activityTypes }: { activityTypes: ActivityType[] 
         );
       })}
 
-      <CreateActivityDialog />
+      <CreateActivityDialog pillar="HEALTH" />
 
       {STATIC_LINKS_AFTER.map(({ href, label, exact }) => (
         <Link key={href} href={href} className={linkClass(isActive(href, exact))}>

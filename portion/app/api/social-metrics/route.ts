@@ -10,6 +10,7 @@ const upsertSchema = z.object({
   followerCount: z.number().int().min(0).max(1_000_000_000),
   videoCount: z.number().int().min(0).max(1_000_000).optional().nullable(),
   notes: z.string().max(500).optional().nullable(),
+  activityTypeId: z.string().cuid().optional().nullable(),
 });
 
 export async function POST(req: Request) {
@@ -29,11 +30,22 @@ export async function POST(req: Request) {
     );
   }
 
+  if (body.activityTypeId) {
+    const activity = await prisma.activityType.findUnique({
+      where: { id: body.activityTypeId },
+      select: { profileId: true, pillar: true },
+    });
+    if (!activity || activity.profileId !== user.id || activity.pillar !== "MONEY") {
+      return NextResponse.json({ error: "Invalid activity" }, { status: 400 });
+    }
+  }
+
   const date = parseISODate(body.date);
   const data = {
     followerCount: body.followerCount,
     videoCount: body.videoCount ?? null,
     notes: body.notes ?? null,
+    activityTypeId: body.activityTypeId ?? null,
   };
 
   const metric = await prisma.socialMetric.upsert({
