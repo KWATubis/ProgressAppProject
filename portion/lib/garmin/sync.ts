@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, addDays } from "@/lib/utils/dates";
 import { getGarminClient, resetGarminClient } from "./client";
@@ -94,7 +95,7 @@ export async function syncWellnessDay(profileId: string, date: Date) {
     maxHeartRate: hr?.maxHeartRate ?? summary?.maxHeartRate ?? null,
     avgHeartRate:
       summary?.averageHeartRateInBeatsPerMinute ?? avg(hr?.heartRateValues),
-    hrSamples: hr?.heartRateValues ?? null,
+    hrSamples: (hr?.heartRateValues ?? Prisma.JsonNull) as Prisma.InputJsonValue | typeof Prisma.JsonNull,
     steps: typeof steps === "number" ? steps : summary?.totalSteps ?? null,
     activeCalories:
       summary?.activeKilocalories != null

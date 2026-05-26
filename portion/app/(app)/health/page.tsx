@@ -8,6 +8,9 @@ import { WeightProgressChart, type WeightDataPoint } from "@/components/charts/W
 import { MacroChart, type MacroDay } from "@/components/charts/MacroChart";
 import { WellnessTodayCards } from "@/components/health/WellnessTodayCards";
 import { GarminSyncButton } from "@/components/health/GarminSyncButton";
+import { BodyExplorer } from "@/components/body/BodyExplorer";
+import { MUSCLE_GROUPS, type MuscleGroup, type MuscleState } from "@/lib/body/muscle-state";
+import { getMuscleStates } from "@/lib/body/muscle-state.server";
 
 export default async function HealthOverviewPage() {
   const supabase = await createClient();
@@ -20,25 +23,48 @@ export default async function HealthOverviewPage() {
   const thirtyDaysAgo = addDays(today, -30);
   const sevenDaysAgo = addDays(today, -7);
 
-  const [weightMetrics, dietLogs, dietToday, wellnessToday] = await Promise.all([
-    prisma.bodyMetric.findMany({
-      where: {
-        profileId: user.id,
-        date: { gte: thirtyDaysAgo },
-        weightKg: { not: null },
-      },
-      orderBy: { date: "asc" },
-    }),
-    prisma.dietLog.findMany({
-      where: { profileId: user.id, date: { gte: sevenDaysAgo } },
-    }),
-    prisma.dietLog.findMany({
-      where: { profileId: user.id, date: today },
-    }),
-    prisma.wellnessDay.findUnique({
-      where: { profileId_date: { profileId: user.id, date: today } },
-    }),
-  ]);
+  const [weightMetrics, dietLogs, dietToday, wellnessToday, wellnessTrend, muscleStateList] =
+    await Promise.all([
+      prisma.bodyMetric.findMany({
+        where: {
+          profileId: user.id,
+          date: { gte: thirtyDaysAgo },
+          weightKg: { not: null },
+        },
+        orderBy: { date: "asc" },
+      }),
+      prisma.dietLog.findMany({
+        where: { profileId: user.id, date: { gte: sevenDaysAgo } },
+      }),
+      prisma.dietLog.findMany({
+        where: { profileId: user.id, date: today },
+      }),
+      prisma.wellnessDay.findUnique({
+        where: { profileId_date: { profileId: user.id, date: today } },
+      }),
+      prisma.wellnessDay.findMany({
+        where: { profileId: user.id, date: { gte: sevenDaysAgo } },
+        orderBy: { date: "asc" },
+      }),
+      getMuscleStates(user.id),
+    ]);
+
+  const muscleStates = MUSCLE_GROUPS.reduce(
+    (acc, g) => {
+      const found = muscleStateList.find((s) => s.group === g);
+      acc[g] = found ?? { group: g, daysSince: null, lastTrainedISO: null, lastSets: [] };
+      return acc;
+    },
+    {} as Record<MuscleGroup, MuscleState>,
+  );
+
+  const wellnessTrendPoints = wellnessTrend.map((w) => ({
+    date: formatISODate(w.date),
+    restingHeartRate: w.restingHeartRate,
+    totalCalories: w.totalCalories,
+    sleepSeconds: w.sleepSeconds,
+    deepSleepSeconds: w.deepSleepSeconds,
+  }));
 
   const weightData: WeightDataPoint[] = weightMetrics.map((m) => ({
     date: formatISODate(m.date),
@@ -99,6 +125,19 @@ export default async function HealthOverviewPage() {
             intakeKcal: intakeKcalToday,
             burnedKcal: wellnessToday?.totalCalories ?? null,
           }}
+        />
+      </section>
+
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-base font-semibold">Your body</h2>
+          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Click any muscle, heart, or head
+          </span>
+        </div>
+        <BodyExplorer
+          muscleStates={muscleStates}
+          wellnessTrend={wellnessTrendPoints}
         />
       </section>
 
