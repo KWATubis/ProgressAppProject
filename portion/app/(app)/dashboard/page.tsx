@@ -27,6 +27,7 @@ export default async function DashboardPage() {
     prisma.task.findMany({
       where: { profileId: user.id, isActive: true },
       orderBy: { sortOrder: "asc" },
+      include: { activityType: { select: { color: true } } },
     }),
     prisma.taskLog.findMany({ where: { profileId: user.id, date: today } }),
     prisma.bodyMetric.findFirst({
@@ -50,6 +51,7 @@ export default async function DashboardPage() {
     title: t.title,
     pillar: t.pillar,
     status: logByTaskId.get(t.id) ?? "PENDING",
+    activityColor: t.activityType?.color ?? null,
   }));
 
   function pillarSlice(pillar: "HEALTH" | "MONEY") {

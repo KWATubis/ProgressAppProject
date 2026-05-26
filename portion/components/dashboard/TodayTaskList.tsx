@@ -10,6 +10,7 @@ export type TodayTask = {
   title: string;
   pillar: "HEALTH" | "MONEY";
   status: "PENDING" | "COMPLETE" | "SKIPPED";
+  activityColor?: string | null;
 };
 
 export function TodayTaskList({
@@ -63,7 +64,14 @@ export function TodayTaskList({
         const Icon = t.pillar === "HEALTH" ? Dumbbell : TrendingUp;
         const accent = t.pillar === "HEALTH" ? "text-emerald-500" : "text-amber-500";
         return (
-          <li key={t.id}>
+          <li key={t.id} className="relative">
+            {t.activityColor && (
+              <span
+                className="absolute inset-y-0 left-0 w-1"
+                style={{ backgroundColor: t.activityColor }}
+                aria-hidden
+              />
+            )}
             <button
               type="button"
               onClick={() => toggle(t.id)}
@@ -79,7 +87,10 @@ export function TodayTaskList({
               >
                 {done ? <Check className="h-3 w-3" strokeWidth={3} /> : <Circle className="h-3 w-3" />}
               </span>
-              <Icon className={cn("h-3.5 w-3.5 shrink-0", accent)} />
+              <Icon
+                className={cn("h-3.5 w-3.5 shrink-0", !t.activityColor && accent)}
+                style={t.activityColor ? { color: t.activityColor } : undefined}
+              />
               <span
                 className={cn(
                   "min-w-0 flex-1 truncate text-sm",

@@ -9,9 +9,9 @@ export default async function HealthLayout({ children }: { children: React.React
   if (!user) redirect("/auth/login");
 
   const activityTypes = await prisma.activityType.findMany({
-    where: { profileId: user.id },
+    where: { profileId: user.id, pillar: "HEALTH" },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, icon: true, kind: true },
+    select: { id: true, name: true, slug: true, icon: true, color: true, kind: true },
   });
 
   return (

@@ -13,7 +13,7 @@ export default async function MoneyLayout({ children }: { children: React.ReactN
   const activityTypes = await prisma.activityType.findMany({
     where: { profileId: user.id, pillar: "MONEY" },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, icon: true, kind: true },
+    select: { id: true, name: true, slug: true, icon: true, color: true, kind: true },
   });
 
   return (

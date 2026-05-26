@@ -8,8 +8,85 @@ function startOfMonthUTC(d: Date): Date {
 /**
  * Compute the current numeric value for a given metric key, for the given
  * profile. Returns null when the user has no data yet.
+ *
+ * Activity-scoped keys (prefix `activity.`) need the goal's activityTypeId;
+ * if missing they resolve to null.
  */
-export async function computeMetricValue(profileId: string, key: string): Promise<number | null> {
+export async function computeMetricValue(
+  profileId: string,
+  key: string,
+  activityTypeId?: string | null,
+): Promise<number | null> {
+  if (key.startsWith("activity.")) {
+    if (!activityTypeId) return null;
+    switch (key) {
+      case "activity.sessions.total": {
+        return prisma.workoutSession.count({
+          where: { profileId, activityTypeId },
+        });
+      }
+      case "activity.cardio.distanceTotal": {
+        const rows = await prisma.runEntry.findMany({
+          where: { session: { profileId, activityTypeId } },
+          select: { distanceKm: true },
+        });
+        if (rows.length === 0) return null;
+        return rows.reduce((s, r) => s + (r.distanceKm ?? 0), 0);
+      }
+      case "activity.social.followers": {
+        const latest = await prisma.socialMetric.findFirst({
+          where: { profileId, activityTypeId },
+          orderBy: { date: "desc" },
+          select: { followerCount: true },
+        });
+        return latest?.followerCount ?? null;
+      }
+      case "activity.income.monthly": {
+        const start = startOfMonthUTC(new Date());
+        const rows = await prisma.incomeEntry.findMany({
+          where: { profileId, activityTypeId, date: { gte: start } },
+          select: { amountPln: true },
+        });
+        if (rows.length === 0) return null;
+        return rows.reduce((s, r) => s + r.amountPln, 0);
+      }
+      case "activity.income.total": {
+        const rows = await prisma.incomeEntry.findMany({
+          where: { profileId, activityTypeId },
+          select: { amountPln: true },
+        });
+        if (rows.length === 0) return null;
+        return rows.reduce((s, r) => s + r.amountPln, 0);
+      }
+      case "activity.business.clients": {
+        const latest = await prisma.businessMetric.findFirst({
+          where: { profileId, activityTypeId, clients: { not: null } },
+          orderBy: { date: "desc" },
+          select: { clients: true },
+        });
+        return latest?.clients ?? null;
+      }
+      case "activity.business.leadsTotal": {
+        const rows = await prisma.businessMetric.findMany({
+          where: { profileId, activityTypeId, leads: { not: null } },
+          select: { leads: true },
+        });
+        if (rows.length === 0) return null;
+        return rows.reduce((s, r) => s + (r.leads ?? 0), 0);
+      }
+      case "activity.business.dealsTotal": {
+        const rows = await prisma.businessMetric.findMany({
+          where: { profileId, activityTypeId, deals: { not: null } },
+          select: { deals: true },
+        });
+        if (rows.length === 0) return null;
+        return rows.reduce((s, r) => s + (r.deals ?? 0), 0);
+      }
+      default:
+        return null;
+    }
+  }
+
   switch (key) {
     case "body.weightKg":
     case "body.bodyFatPct":
@@ -92,13 +169,19 @@ export async function computeMetricValue(profileId: string, key: string): Promis
 
 /** Resolve fresh currentValue for an array of goals — leaves goals without
  *  metricKey untouched. Returns a new array of the same shape. */
-export async function withDerivedCurrent<T extends { id: string; profileId: string; metricKey: string | null; currentValue: number | null }>(
-  goals: T[],
-): Promise<T[]> {
+export async function withDerivedCurrent<
+  T extends {
+    id: string;
+    profileId: string;
+    metricKey: string | null;
+    currentValue: number | null;
+    activityTypeId?: string | null;
+  },
+>(goals: T[]): Promise<T[]> {
   const out: T[] = [];
   for (const g of goals) {
     if (g.metricKey) {
-      const v = await computeMetricValue(g.profileId, g.metricKey);
+      const v = await computeMetricValue(g.profileId, g.metricKey, g.activityTypeId ?? null);
       out.push({ ...g, currentValue: v });
     } else {
       out.push(g);

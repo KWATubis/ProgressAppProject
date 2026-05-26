@@ -13,6 +13,7 @@ export type CalendarTask = {
   startMinute: number | null;
   dayOfWeek: number[];
   scheduledAt: string | null;
+  activityColor?: string | null;
 };
 
 const FREQ_LABEL: Record<CalendarTask["frequency"], string> = {
@@ -55,10 +56,17 @@ export function TaskCard({
 }) {
   const done = task.status === "COMPLETE";
   const Icon = task.pillar === "HEALTH" ? Dumbbell : TrendingUp;
-  const accent =
-    task.pillar === "HEALTH"
+  const accent = task.activityColor
+    ? "text-white dark:text-white"
+    : task.pillar === "HEALTH"
       ? "border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-900/20 dark:text-emerald-100"
       : "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-100";
+  const colorStyle: React.CSSProperties | undefined = task.activityColor
+    ? {
+        borderColor: `${task.activityColor}66`,
+        backgroundColor: `${task.activityColor}22`,
+      }
+    : undefined;
 
   return (
     <div
@@ -69,6 +77,7 @@ export function TaskCard({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onDoubleClick={onEdit}
+      style={colorStyle}
       className={cn(
         "group relative flex w-full items-start gap-1.5 rounded-md border px-1.5 py-1.5 text-left text-xs transition hover:shadow-sm",
         accent,
@@ -103,7 +112,10 @@ export function TaskCard({
           {task.title}
         </span>
         <span className="mt-0.5 flex items-center gap-1.5 text-[10px] uppercase tracking-wider opacity-70">
-          <Icon className="h-2.5 w-2.5" />
+          <Icon
+            className="h-2.5 w-2.5"
+            style={task.activityColor ? { color: task.activityColor } : undefined}
+          />
           {FREQ_LABEL[task.frequency]}
           {task.durationMin != null && (
             <>

@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { upsertGoal } from "@/app/(app)/goals/actions";
+import { ACTIVITY_COLORS } from "@/lib/activity-colors";
 
 type Pillar = "HEALTH" | "MONEY";
 type HealthKind = "STRENGTH" | "CARDIO" | "SPORT";
@@ -78,6 +79,7 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
   const [kind, setKind] = useState<ActivityKind | null>(null);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("");
+  const [color, setColor] = useState<string>(ACTIVITY_COLORS[0]);
   const [tasks, setTasks] = useState<DraftTask[]>([]);
   const [goalTitle, setGoalTitle] = useState("");
   const [goalTarget, setGoalTarget] = useState("");
@@ -93,6 +95,7 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
     setKind(null);
     setName("");
     setIcon("");
+    setColor(ACTIVITY_COLORS[0]);
     setTasks([]);
     setGoalTitle("");
     setGoalTarget("");
@@ -160,7 +163,7 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
       const res = await fetch("/api/activities", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), icon, kind, pillar }),
+        body: JSON.stringify({ name: name.trim(), icon, kind, pillar, color }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -266,26 +269,46 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
             }}
             className="space-y-4 pt-2"
           >
-            <div className="space-y-2">
-              <Label>Icon</Label>
-              <Input
-                placeholder="emoji…"
-                value={icon}
-                onChange={(e) => setIcon(e.target.value)}
-                maxLength={4}
-                className="w-24"
-              />
+            <div className="flex gap-3">
+              <div className="space-y-2">
+                <Label>Icon</Label>
+                <Input
+                  placeholder="emoji…"
+                  value={icon}
+                  onChange={(e) => setIcon(e.target.value)}
+                  maxLength={4}
+                  className="w-24"
+                />
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="activity-name">Name</Label>
+                <Input
+                  id="activity-name"
+                  placeholder={activeKind?.placeholder ?? "Activity name"}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoFocus
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="activity-name">Name</Label>
-              <Input
-                id="activity-name"
-                placeholder={activeKind?.placeholder ?? "Activity name"}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                autoFocus
-              />
+              <Label>Colour</Label>
+              <div className="flex flex-wrap gap-2">
+                {ACTIVITY_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setColor(c)}
+                    className={cn(
+                      "h-7 w-7 rounded-full transition-transform",
+                      color === c ? "scale-110 ring-2 ring-white/80 ring-offset-2 ring-offset-background" : "hover:scale-105",
+                    )}
+                    style={{ backgroundColor: c }}
+                    title={c}
+                  />
+                ))}
+              </div>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <div className="flex justify-between gap-2">

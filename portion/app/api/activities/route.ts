@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
+import { isValidColor } from "@/lib/activity-colors";
 
 const HEALTH_KINDS = ["STRENGTH", "CARDIO", "SPORT"] as const;
 const MONEY_KINDS = ["SOCIAL", "SIDE_INCOME", "MAIN_INCOME", "BUSINESS"] as const;
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
       ...(pillar === "HEALTH" || pillar === "MONEY" ? { pillar } : {}),
     },
     orderBy: { createdAt: "asc" },
-    select: { id: true, name: true, slug: true, icon: true, kind: true, pillar: true },
+    select: { id: true, name: true, slug: true, icon: true, color: true, kind: true, pillar: true },
   });
   return NextResponse.json(activities);
 }
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
   const kind: string = body.kind ?? "";
   const pillar: string = body.pillar ?? "";
   const icon: string | null = body.icon || null;
+  const color: string | null = isValidColor(body.color) ? body.color : null;
 
   if (!name) return NextResponse.json({ error: "Name is required" }, { status: 400 });
   if (pillar !== "HEALTH" && pillar !== "MONEY") {
@@ -59,6 +61,7 @@ export async function POST(request: Request) {
         name,
         slug,
         icon,
+        color,
         pillar: pillar as "HEALTH" | "MONEY",
         kind: kind as ActivityKind,
       },

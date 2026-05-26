@@ -8,7 +8,12 @@ import { PlanSection } from "@/components/health/PlanSection";
 import { GarminUploadButton } from "@/components/health/GarminUploadButton";
 import { CardioSessionCard, type CardioSessionView } from "@/components/health/CardioSessionCard";
 import { DeleteActivityButton } from "@/components/health/DeleteActivityButton";
+import { EditActivityButton } from "@/components/activities/EditActivityButton";
+import { ActivityGoalCard, type ActivityGoalData } from "@/components/activities/ActivityGoalCard";
 import { AddTaskDialog } from "@/components/tasks/AddTaskDialog";
+import { withDerivedCurrent } from "@/lib/goalMetrics.server";
+import { formatISODate } from "@/lib/utils/dates";
+import type { ActivityKind } from "@/lib/goalMetrics";
 
 function paceStr(secPerKm: number) {
   return `${Math.floor(secPerKm / 60)}:${String(secPerKm % 60).padStart(2, "0")}`;
@@ -49,10 +54,48 @@ export default async function ActivityPage({
     },
   });
 
+  const rawActivityGoals = await prisma.goal.findMany({
+    where: { profileId: user.id, activityTypeId: activity.id, isActive: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const activityGoals = await withDerivedCurrent(rawActivityGoals);
+  const rawActivityGoal = activityGoals[0] ?? null;
+  const activityGoal: ActivityGoalData | null = rawActivityGoal
+    ? {
+        id: rawActivityGoal.id,
+        title: rawActivityGoal.title,
+        description: rawActivityGoal.description,
+        currentValue: rawActivityGoal.currentValue,
+        targetValue: rawActivityGoal.targetValue,
+        startValue: rawActivityGoal.startValue,
+        unit: rawActivityGoal.unit,
+        metricKey: rawActivityGoal.metricKey,
+        targetDate: rawActivityGoal.targetDate ? formatISODate(rawActivityGoal.targetDate) : null,
+      }
+    : null;
+
+  const goalCard = (
+    <ActivityGoalCard
+      goal={activityGoal}
+      activityTypeId={activity.id}
+      activityName={activity.name}
+      pillar="HEALTH"
+      kind={activity.kind as ActivityKind}
+      color={activity.color}
+    />
+  );
+
   const header = (
     <div className="flex items-start justify-between gap-2">
-      <h2 className="text-xl font-semibold">
-        {activity.icon && <span className="mr-2">{activity.icon}</span>}
+      <h2 className="flex items-center gap-2.5 text-xl font-semibold">
+        {activity.color && (
+          <span
+            className="inline-block h-3 w-3 rounded-full"
+            style={{ backgroundColor: activity.color }}
+            aria-hidden
+          />
+        )}
+        {activity.icon && <span>{activity.icon}</span>}
         {activity.name}
       </h2>
       <div className="flex items-center gap-2">
@@ -61,6 +104,12 @@ export default async function ActivityPage({
           <Button size="sm">Log session</Button>
         </Link>
         <AddTaskDialog activityTypeId={activity.id} lockedPillar="HEALTH" />
+        <EditActivityButton
+          slug={activity.slug}
+          name={activity.name}
+          icon={activity.icon}
+          color={activity.color}
+        />
         <DeleteActivityButton slug={activity.slug} activityName={activity.name} pillar="HEALTH" />
       </div>
     </div>
@@ -88,6 +137,7 @@ export default async function ActivityPage({
     return (
       <div className="space-y-6">
         {header}
+        {goalCard}
 
         {/* Plan overview */}
         {activity.workoutPlan && (
@@ -183,6 +233,7 @@ export default async function ActivityPage({
     return (
       <div className="space-y-6">
         {header}
+        {goalCard}
 
         {sessions.length > 0 && (
           <div className="flex gap-6 text-sm">
@@ -265,6 +316,7 @@ export default async function ActivityPage({
   return (
     <div className="space-y-6">
       {header}
+      {goalCard}
 
       {totalSessions > 0 && (
         <div className="flex gap-6 text-sm">

@@ -171,6 +171,7 @@ model ActivityType {
   name            String
   slug            String
   icon            String?
+  color           String?
   pillar          Pillar           @default(HEALTH)
   kind            ActivityKind
   workoutPlan     WorkoutPlan?

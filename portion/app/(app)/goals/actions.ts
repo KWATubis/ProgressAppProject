@@ -65,7 +65,7 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
       return { error: `That metric belongs to the ${metric.pillar.toLowerCase()} pillar.` };
     }
     metricKey = metric.key;
-    resolvedCurrent = await computeMetricValue(user.id, metric.key);
+    resolvedCurrent = await computeMetricValue(user.id, metric.key, data.activityTypeId ?? null);
     resolvedUnit = metric.unit;
   }
 

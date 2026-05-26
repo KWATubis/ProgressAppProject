@@ -38,6 +38,7 @@ export default async function TasksPage({
     prisma.task.findMany({
       where: { profileId: user.id, isActive: true },
       orderBy: [{ pillar: "asc" }, { sortOrder: "asc" }],
+      include: { activityType: { select: { color: true } } },
     }),
     prisma.taskLog.findMany({
       where: {
@@ -78,6 +79,7 @@ export default async function TasksPage({
         startMinute: t.startMinute,
         dayOfWeek: t.dayOfWeek,
         scheduledAt: t.scheduledAt ? formatISODate(t.scheduledAt) : null,
+        activityColor: t.activityType?.color ?? null,
       }))
       // SKIPPED tasks are hidden for that specific day. The recurring task
       // itself stays untouched and shows on its other scheduled days.

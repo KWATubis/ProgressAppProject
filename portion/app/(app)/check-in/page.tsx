@@ -22,6 +22,7 @@ export default async function CheckInPage() {
     prisma.task.findMany({
       where: { profileId: user.id, isActive: true },
       orderBy: { sortOrder: "asc" },
+      include: { activityType: { select: { color: true } } },
     }),
     prisma.taskLog.findMany({ where: { profileId: user.id, date: today } }),
     prisma.dietLog.findMany({ where: { profileId: user.id, date: today }, orderBy: { createdAt: "asc" } }),
@@ -43,6 +44,7 @@ export default async function CheckInPage() {
       title: t.title,
       pillar: t.pillar,
       status: logByTaskId.get(t.id) ?? "PENDING",
+      activityColor: t.activityType?.color ?? null,
     }));
 
   const meals: Meal[] = dietToday.map((m) => ({

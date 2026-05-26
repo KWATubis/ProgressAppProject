@@ -10,6 +10,7 @@ type ActivityType = {
   name: string;
   slug: string;
   icon: string | null;
+  color: string | null;
   kind: "STRENGTH" | "CARDIO" | "SPORT";
 };
 
@@ -45,7 +46,14 @@ export function HealthSubNav({ activityTypes }: { activityTypes: ActivityType[] 
       {activityTypes.map((a) => {
         const href = `/health/activity/${a.slug}`;
         return (
-          <Link key={a.id} href={href} className={linkClass(pathname.startsWith(href))}>
+          <Link key={a.id} href={href} className={cn(linkClass(pathname.startsWith(href)), "inline-flex items-center gap-1.5")}>
+            {a.color && (
+              <span
+                className="inline-block h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: a.color }}
+                aria-hidden
+              />
+            )}
             {a.icon ? `${a.icon} ${a.name}` : a.name}
           </Link>
         );
