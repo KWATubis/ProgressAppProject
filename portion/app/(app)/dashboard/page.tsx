@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   const [profile, rawGoals, tasks, logsToday, latestWeight, dietToday, latestSocial] = await Promise.all([
     prisma.profile.findUnique({ where: { id: user.id }, select: { name: true, email: true } }),
     prisma.goal.findMany({
-      where: { profileId: user.id, isActive: true },
+      where: { profileId: user.id, isActive: true, activityTypeId: null },
       orderBy: { createdAt: "asc" },
     }),
     prisma.task.findMany({
