@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate, addDays } from "@/lib/utils/dates";
 import { WeightProgressChart, type WeightDataPoint } from "@/components/charts/WeightProgressChart";
 import { MacroChart, type MacroDay } from "@/components/charts/MacroChart";
-import { WorkoutSessionCard, type WorkoutSessionSummary } from "@/components/health/WorkoutSessionCard";
+import { WellnessTodayCards } from "@/components/health/WellnessTodayCards";
+import { GarminSyncButton } from "@/components/health/GarminSyncButton";
 
 export default async function HealthOverviewPage() {
   const supabase = await createClient();
@@ -19,13 +20,7 @@ export default async function HealthOverviewPage() {
   const thirtyDaysAgo = addDays(today, -30);
   const sevenDaysAgo = addDays(today, -7);
 
-  const [recentSessions, weightMetrics, dietLogs] = await Promise.all([
-    prisma.workoutSession.findMany({
-      where: { profileId: user.id },
-      orderBy: { date: "desc" },
-      take: 5,
-      include: { exercises: true },
-    }),
+  const [weightMetrics, dietLogs, dietToday, wellnessToday] = await Promise.all([
     prisma.bodyMetric.findMany({
       where: {
         profileId: user.id,
@@ -37,15 +32,13 @@ export default async function HealthOverviewPage() {
     prisma.dietLog.findMany({
       where: { profileId: user.id, date: { gte: sevenDaysAgo } },
     }),
+    prisma.dietLog.findMany({
+      where: { profileId: user.id, date: today },
+    }),
+    prisma.wellnessDay.findUnique({
+      where: { profileId_date: { profileId: user.id, date: today } },
+    }),
   ]);
-
-  const sessionSummaries: WorkoutSessionSummary[] = recentSessions.map((s) => ({
-    id: s.id,
-    date: s.date,
-    type: s.type,
-    exerciseCount: new Set(s.exercises.map((e) => e.exerciseId)).size,
-    totalSets: s.exercises.length,
-  }));
 
   const weightData: WeightDataPoint[] = weightMetrics.map((m) => ({
     date: formatISODate(m.date),
@@ -67,27 +60,46 @@ export default async function HealthOverviewPage() {
     .map(([date, totals]) => ({ date, ...totals }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  const intakeKcalToday = dietToday.reduce((sum, m) => sum + m.kcal, 0);
+
+  const hrSamples = (wellnessToday?.hrSamples ?? null) as
+    | Array<[number, number | null]>
+    | null;
+
   return (
     <div className="space-y-8">
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-base font-semibold">Recent Workouts</h2>
-          <Link
-            href="/health/workout"
-            className="flex items-center gap-0.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            All <ArrowRight className="h-3 w-3" />
-          </Link>
+          <h2 className="text-base font-semibold">Today</h2>
+          <GarminSyncButton
+            days={7}
+            lastSyncedAt={wellnessToday?.syncedAt?.toISOString() ?? null}
+          />
         </div>
-        {sessionSummaries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No workouts logged yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {sessionSummaries.map((s) => (
-              <WorkoutSessionCard key={s.id} session={s} />
-            ))}
-          </div>
-        )}
+        <WellnessTodayCards
+          hr={{
+            resting: wellnessToday?.restingHeartRate ?? null,
+            min: wellnessToday?.minHeartRate ?? null,
+            max: wellnessToday?.maxHeartRate ?? null,
+            samples: hrSamples,
+          }}
+          sleep={{
+            totalSeconds: wellnessToday?.sleepSeconds ?? null,
+            deepSeconds: wellnessToday?.deepSleepSeconds ?? null,
+            lightSeconds: wellnessToday?.lightSleepSeconds ?? null,
+            remSeconds: wellnessToday?.remSleepSeconds ?? null,
+            awakeSeconds: wellnessToday?.awakeSleepSeconds ?? null,
+          }}
+          calories={{
+            total: wellnessToday?.totalCalories ?? null,
+            active: wellnessToday?.activeCalories ?? null,
+            resting: wellnessToday?.restingCalories ?? null,
+          }}
+          balance={{
+            intakeKcal: intakeKcalToday,
+            burnedKcal: wellnessToday?.totalCalories ?? null,
+          }}
+        />
       </section>
 
       <section className="space-y-3">

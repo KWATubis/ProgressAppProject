@@ -73,6 +73,7 @@ model Profile {
   incomeEntries     IncomeEntry[]
   businessMetrics   BusinessMetric[]
   activityTypes     ActivityType[]
+  wellnessDays      WellnessDay[]
   onboardingSession OnboardingSession?
 }
 
@@ -307,6 +308,33 @@ model DietLog {
   carbsG    Float
   notes     String?
   createdAt DateTime @default(now())
+}
+
+model WellnessDay {
+  id                  String   @id @default(cuid())
+  profileId           String
+  profile             Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date                DateTime
+  restingHeartRate    Int?
+  minHeartRate        Int?
+  maxHeartRate        Int?
+  avgHeartRate        Int?
+  hrSamples           Json?
+  steps               Int?
+  activeCalories      Int?
+  restingCalories     Int?
+  totalCalories       Int?
+  sleepSeconds        Int?
+  deepSleepSeconds    Int?
+  lightSleepSeconds   Int?
+  remSleepSeconds     Int?
+  awakeSleepSeconds   Int?
+  sleepStartTs        DateTime?
+  sleepEndTs          DateTime?
+  syncedAt            DateTime @default(now())
+
+  @@unique([profileId, date])
+  @@index([profileId, date])
 }
 
 model BodyMetric {
