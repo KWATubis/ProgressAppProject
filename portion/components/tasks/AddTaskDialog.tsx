@@ -58,10 +58,16 @@ export function AddTaskDialog({
   task,
   open: openProp,
   onOpenChange,
+  activityTypeId,
+  lockedPillar,
 }: {
   task?: TaskEditorTask;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** When set, every created task is linked to this activity. Pillar is locked. */
+  activityTypeId?: string;
+  /** Force the pillar (and hide the toggle). Used when adding from an activity page. */
+  lockedPillar?: Pillar;
 } = {}) {
   const router = useRouter();
   const [internalOpen, setInternalOpen] = useState(false);
@@ -70,9 +76,11 @@ export function AddTaskDialog({
   const [pending, startTransition] = useTransition();
 
   const editing = !!task;
+  const pillarLocked = lockedPillar != null;
+  const defaultPillar: Pillar = task?.pillar ?? lockedPillar ?? "HEALTH";
 
   const [title, setTitle] = useState(task?.title ?? "");
-  const [pillar, setPillar] = useState<Pillar>(task?.pillar ?? "HEALTH");
+  const [pillar, setPillar] = useState<Pillar>(defaultPillar);
   const [frequency, setFrequency] = useState<Frequency>(task?.frequency ?? "DAILY");
   const [dayOfWeek, setDayOfWeek] = useState<number[]>(task?.dayOfWeek ?? []);
   const [scheduledAt, setScheduledAt] = useState<string>(task?.scheduledAt ?? "");
@@ -85,17 +93,17 @@ export function AddTaskDialog({
   useEffect(() => {
     if (!open) return;
     setTitle(task?.title ?? "");
-    setPillar(task?.pillar ?? "HEALTH");
+    setPillar(task?.pillar ?? lockedPillar ?? "HEALTH");
     setFrequency(task?.frequency ?? "DAILY");
     setDayOfWeek(task?.dayOfWeek ?? []);
     setScheduledAt(task?.scheduledAt ?? "");
     setDurationMin(task?.durationMin != null ? String(task.durationMin) : "");
     setStartTime(minutesToTimeStr(task?.startMinute));
-  }, [open, task]);
+  }, [open, task, lockedPillar]);
 
   function resetCreate() {
     setTitle("");
-    setPillar("HEALTH");
+    setPillar(lockedPillar ?? "HEALTH");
     setFrequency("DAILY");
     setDayOfWeek([]);
     setScheduledAt("");
@@ -156,6 +164,7 @@ export function AddTaskDialog({
             scheduledAt: frequency === "ONE_TIME" ? scheduledAt : null,
             durationMin: parsedDuration,
             startMinute: parsedStart,
+            activityTypeId: activityTypeId ?? null,
           }),
         });
         if (!res.ok) {
@@ -208,26 +217,28 @@ export function AddTaskDialog({
             />
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Pillar</Label>
-            <div className="flex gap-2">
-              {(["HEALTH", "MONEY"] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPillar(p)}
-                  className={cn(
-                    "flex-1 rounded-md border px-3 py-2 text-sm font-medium transition",
-                    pillar === p
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-input hover:bg-accent",
-                  )}
-                >
-                  {p === "HEALTH" ? "Health" : "Money"}
-                </button>
-              ))}
+          {!pillarLocked && (
+            <div className="space-y-1.5">
+              <Label>Pillar</Label>
+              <div className="flex gap-2">
+                {(["HEALTH", "MONEY"] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPillar(p)}
+                    className={cn(
+                      "flex-1 rounded-md border px-3 py-2 text-sm font-medium transition",
+                      pillar === p
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-input hover:bg-accent",
+                    )}
+                  >
+                    {p === "HEALTH" ? "Health" : "Money"}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Frequency</Label>

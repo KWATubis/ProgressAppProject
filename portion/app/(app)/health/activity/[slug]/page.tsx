@@ -8,6 +8,7 @@ import { PlanSection } from "@/components/health/PlanSection";
 import { GarminUploadButton } from "@/components/health/GarminUploadButton";
 import { CardioSessionCard, type CardioSessionView } from "@/components/health/CardioSessionCard";
 import { DeleteActivityButton } from "@/components/health/DeleteActivityButton";
+import { AddTaskDialog } from "@/components/tasks/AddTaskDialog";
 
 function paceStr(secPerKm: number) {
   return `${Math.floor(secPerKm / 60)}:${String(secPerKm % 60).padStart(2, "0")}`;
@@ -59,7 +60,8 @@ export default async function ActivityPage({
         <Link href="/check-in">
           <Button size="sm">Log session</Button>
         </Link>
-        <DeleteActivityButton slug={activity.slug} activityName={activity.name} />
+        <AddTaskDialog activityTypeId={activity.id} lockedPillar="HEALTH" />
+        <DeleteActivityButton slug={activity.slug} activityName={activity.name} pillar="HEALTH" />
       </div>
     </div>
   );

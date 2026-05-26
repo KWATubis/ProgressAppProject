@@ -7,6 +7,10 @@ import { IncomeChart, type IncomeMonth } from "@/components/charts/IncomeChart";
 import { SocialMetricForm } from "@/components/money/SocialMetricForm";
 import { IncomeForm } from "@/components/money/IncomeForm";
 import { IncomeList, type IncomeRow } from "@/components/money/IncomeList";
+import { DeleteActivityButton } from "@/components/health/DeleteActivityButton";
+import { AddTaskDialog } from "@/components/tasks/AddTaskDialog";
+import { BusinessMetricForm } from "@/components/money/BusinessMetricForm";
+import { BusinessMetricsChart, type BusinessMetricPoint } from "@/components/charts/BusinessMetricsChart";
 
 export default async function MoneyActivityPage({
   params,
@@ -30,6 +34,10 @@ export default async function MoneyActivityPage({
         {activity.icon && <span className="mr-2">{activity.icon}</span>}
         {activity.name}
       </h2>
+      <div className="flex items-center gap-2">
+        <AddTaskDialog activityTypeId={activity.id} lockedPillar="MONEY" />
+        <DeleteActivityButton slug={activity.slug} activityName={activity.name} pillar="MONEY" />
+      </div>
     </div>
   );
 
@@ -143,7 +151,7 @@ export default async function MoneyActivityPage({
   };
   const cfg = labelByKind[activity.kind] ?? { entryWord: "entry", submitLabel: "Log entry", descLabel: "Notes" };
 
-  const [goals, entries] = await Promise.all([
+  const [goals, entries, businessMetrics] = await Promise.all([
     prisma.goal.findMany({
       where: { profileId: user.id, pillar: "MONEY", isActive: true },
     }),
@@ -151,7 +159,21 @@ export default async function MoneyActivityPage({
       where: { profileId: user.id, activityTypeId: activity.id },
       orderBy: { date: "desc" },
     }),
+    activity.kind === "BUSINESS"
+      ? prisma.businessMetric.findMany({
+          where: { profileId: user.id, activityTypeId: activity.id },
+          orderBy: { date: "asc" },
+        })
+      : Promise.resolve([] as { id: string; date: Date; clients: number | null; leads: number | null; deals: number | null }[]),
   ]);
+
+  const businessPoints: BusinessMetricPoint[] = businessMetrics.map((m) => ({
+    date: formatISODate(m.date),
+    clients: m.clients,
+    leads: m.leads,
+    deals: m.deals,
+  }));
+  const latestBusiness = businessMetrics[businessMetrics.length - 1];
 
   const incomeGoal = goals.find(
     (g) => (g.unit ?? "").toLowerCase().includes("pln") || (g.unit ?? "").toLowerCase().includes("month"),
@@ -200,6 +222,47 @@ export default async function MoneyActivityPage({
             <p className="text-muted-foreground">{cfg.entryWord}s logged</p>
           </div>
         </div>
+      )}
+
+      {activity.kind === "BUSINESS" && latestBusiness && (
+        <div className="flex flex-wrap gap-6 text-sm">
+          {latestBusiness.clients != null && (
+            <div>
+              <p className="text-2xl font-semibold tabular-nums">{latestBusiness.clients}</p>
+              <p className="text-muted-foreground">clients</p>
+            </div>
+          )}
+          {latestBusiness.leads != null && (
+            <div>
+              <p className="text-2xl font-semibold tabular-nums">{latestBusiness.leads}</p>
+              <p className="text-muted-foreground">leads (latest)</p>
+            </div>
+          )}
+          {latestBusiness.deals != null && (
+            <div>
+              <p className="text-2xl font-semibold tabular-nums">{latestBusiness.deals}</p>
+              <p className="text-muted-foreground">deals (latest)</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activity.kind === "BUSINESS" && (
+        <section className="space-y-3">
+          <h3 className="text-base font-semibold">Log clients / leads / deals</h3>
+          <div className="rounded-lg border border-white/10 bg-card p-4">
+            <BusinessMetricForm activityTypeId={activity.id} />
+          </div>
+        </section>
+      )}
+
+      {activity.kind === "BUSINESS" && businessPoints.length > 0 && (
+        <section className="space-y-3">
+          <h3 className="text-base font-semibold">Pipeline over time</h3>
+          <div className="rounded-lg border border-white/10 bg-card p-4">
+            <BusinessMetricsChart data={businessPoints} />
+          </div>
+        </section>
       )}
 
       <section className="space-y-3">

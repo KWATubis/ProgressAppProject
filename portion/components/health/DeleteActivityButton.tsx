@@ -18,9 +18,11 @@ import {
 export function DeleteActivityButton({
   slug,
   activityName,
+  pillar = "HEALTH",
 }: {
   slug: string;
   activityName: string;
+  pillar?: "HEALTH" | "MONEY";
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -29,11 +31,11 @@ export function DeleteActivityButton({
   function remove() {
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/health/activities/${slug}`, { method: "DELETE" });
+        const res = await fetch(`/api/activities/${slug}`, { method: "DELETE" });
         if (!res.ok) throw new Error(await res.text());
         toast.success(`${activityName} deleted.`);
         setOpen(false);
-        router.push("/health");
+        router.push(pillar === "MONEY" ? "/money" : "/health");
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Failed to delete activity");

@@ -18,6 +18,7 @@ const upsertSchema = z.object({
   targetDate: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   metricKey: z.string().nullable().optional(),
+  activityTypeId: z.string().nullable().optional(),
 });
 
 export type UpsertGoalInput = z.infer<typeof upsertSchema>;
@@ -99,6 +100,7 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
           metricKey,
           targetDate: data.targetDate ? new Date(data.targetDate) : null,
           isActive: data.isActive ?? true,
+          activityTypeId: data.activityTypeId ?? null,
         },
       });
     } else {
@@ -115,6 +117,7 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
           metricKey,
           targetDate: data.targetDate ? new Date(data.targetDate) : null,
           isActive: data.isActive ?? true,
+          activityTypeId: data.activityTypeId ?? null,
         },
       });
     }

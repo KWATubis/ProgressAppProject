@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { upsertGoal } from "@/app/(app)/goals/actions";
 
 type Pillar = "HEALTH" | "MONEY";
 type HealthKind = "STRENGTH" | "CARDIO" | "SPORT";
@@ -73,17 +74,19 @@ type DraftTask = {
 export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [kind, setKind] = useState<ActivityKind | null>(null);
   const [name, setName] = useState("");
   const [icon, setIcon] = useState("");
   const [tasks, setTasks] = useState<DraftTask[]>([]);
+  const [goalTitle, setGoalTitle] = useState("");
+  const [goalTarget, setGoalTarget] = useState("");
+  const [goalUnit, setGoalUnit] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   const kinds = pillar === "HEALTH" ? HEALTH_KINDS : MONEY_KINDS;
   const activeKind = kinds.find((x) => x.kind === kind) ?? null;
-  const hasSuggestedTasks = kind ? DEFAULT_TASKS[kind].length > 0 : false;
 
   function reset() {
     setStep(1);
@@ -91,6 +94,9 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
     setName("");
     setIcon("");
     setTasks([]);
+    setGoalTitle("");
+    setGoalTarget("");
+    setGoalUnit("");
     setError("");
   }
 
@@ -102,19 +108,20 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
 
   function handleStep2Continue() {
     if (!name.trim() || !kind) return;
-    if (hasSuggestedTasks) {
-      const drafts: DraftTask[] = DEFAULT_TASKS[kind].map((d) => ({
-        enabled: true,
-        title: d.template.replace("{name}", name.trim()),
-        frequency: d.frequency,
-        dayOfWeek: [...d.dayOfWeek],
-        durationMin: d.durationMin,
-      }));
-      setTasks(drafts);
-      setStep(3);
-    } else {
-      submit([]);
-    }
+    setStep(3);
+  }
+
+  function handleStep3Continue() {
+    if (!kind) return;
+    const drafts: DraftTask[] = DEFAULT_TASKS[kind].map((d) => ({
+      enabled: true,
+      title: d.template.replace("{name}", name.trim()),
+      frequency: d.frequency,
+      dayOfWeek: [...d.dayOfWeek],
+      durationMin: d.durationMin,
+    }));
+    setTasks(drafts);
+    setStep(4);
   }
 
   function handleOpenChange(v: boolean) {
@@ -134,6 +141,17 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
     );
   }
 
+  function addEmptyTask() {
+    setTasks((prev) => [
+      ...prev,
+      { enabled: true, title: "", frequency: "DAILY", dayOfWeek: [], durationMin: undefined },
+    ]);
+  }
+
+  function removeTask(idx: number) {
+    setTasks((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   async function submit(taskDrafts: DraftTask[]) {
     if (!kind) return;
     setSaving(true);
@@ -150,6 +168,20 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
         return;
       }
       const activity: { id: string } = await res.json();
+
+      const failures: string[] = [];
+
+      if (goalTitle.trim()) {
+        const target = goalTarget.trim() ? Number(goalTarget) : null;
+        const goalRes = await upsertGoal({
+          pillar,
+          title: goalTitle.trim(),
+          targetValue: Number.isFinite(target) ? (target as number) : null,
+          unit: goalUnit.trim() || null,
+          activityTypeId: activity.id,
+        });
+        if ("error" in goalRes) failures.push("goal");
+      }
 
       const enabledTasks = taskDrafts.filter((t) => t.enabled && t.title.trim());
       if (enabledTasks.length > 0) {
@@ -170,9 +202,11 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
           ),
         );
         const failed = results.filter((r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok));
-        if (failed.length > 0) {
-          setError(`Activity created, but ${failed.length} task${failed.length > 1 ? "s" : ""} failed to save.`);
-        }
+        if (failed.length > 0) failures.push(`${failed.length} task${failed.length > 1 ? "s" : ""}`);
+      }
+
+      if (failures.length > 0) {
+        setError(`Activity created, but ${failures.join(" + ")} failed to save.`);
       }
 
       setOpen(false);
@@ -201,7 +235,8 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
           <DialogTitle>
             {step === 1 && "What are you tracking?"}
             {step === 2 && "Name your activity"}
-            {step === 3 && "Set up daily tasks"}
+            {step === 3 && "Set a mini-goal"}
+            {step === 4 && "Set up daily tasks"}
           </DialogTitle>
         </DialogHeader>
 
@@ -262,7 +297,7 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
                   Cancel
                 </Button>
                 <Button type="submit" disabled={saving || !name.trim()}>
-                  {saving ? "Saving…" : hasSuggestedTasks ? "Continue" : "Create"}
+                  {saving ? "Saving…" : "Continue"}
                 </Button>
               </div>
             </div>
@@ -270,11 +305,81 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
         )}
 
         {step === 3 && kind && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleStep3Continue();
+            }}
+            className="space-y-4 pt-2"
+          >
+            <p className="text-xs text-muted-foreground">
+              Give this activity a point. What are you chasing? (Optional — you can skip.)
+            </p>
+
+            <div className="space-y-2">
+              <Label htmlFor="goal-title">Goal</Label>
+              <Input
+                id="goal-title"
+                placeholder={
+                  pillar === "MONEY"
+                    ? "e.g. Earn 5k/month from coaching"
+                    : "e.g. Hold a 30s handstand"
+                }
+                value={goalTitle}
+                onChange={(e) => setGoalTitle(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="goal-target">Target (optional)</Label>
+                <Input
+                  id="goal-target"
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="e.g. 5000"
+                  value={goalTarget}
+                  onChange={(e) => setGoalTarget(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="goal-unit">Unit</Label>
+                <Input
+                  id="goal-unit"
+                  placeholder={pillar === "MONEY" ? "PLN/month" : "followers, kg…"}
+                  value={goalUnit}
+                  onChange={(e) => setGoalUnit(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
+                Back
+              </Button>
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={handleStep3Continue}>
+                  Skip
+                </Button>
+                <Button type="submit">Continue</Button>
+              </div>
+            </div>
+          </form>
+        )}
+
+        {step === 4 && kind && (
           <div className="space-y-4 pt-2">
             <p className="text-xs text-muted-foreground">
               Tasks linked to this activity will show in your calendar — and tick automatically when you log a session.
               Adjust now or skip.
             </p>
+
+            {tasks.length === 0 && (
+              <p className="rounded-lg border border-dashed bg-card/40 p-4 text-center text-xs text-muted-foreground">
+                No tasks yet. Add one below, or skip.
+              </p>
+            )}
 
             <div className="space-y-3">
               {tasks.map((t, i) => (
@@ -295,8 +400,17 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
                         setTasks((prev) => prev.map((x, idx) => (idx === i ? { ...x, title: e.target.value } : x)))
                       }
                       disabled={!t.enabled}
+                      placeholder="Task name"
                       className="h-8 text-sm"
                     />
+                    <button
+                      type="button"
+                      onClick={() => removeTask(i)}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="Remove task"
+                    >
+                      ×
+                    </button>
                   </div>
 
                   <div className={cn("flex flex-wrap items-center gap-2 pl-6", !t.enabled && "opacity-40")}>
@@ -340,18 +454,46 @@ export function CreateActivityDialog({ pillar }: { pillar: Pillar }) {
                       </div>
                     )}
 
-                    {t.durationMin != null && (
-                      <span className="text-xs text-muted-foreground">· {t.durationMin} min</span>
-                    )}
+                    <label className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        step={5}
+                        disabled={!t.enabled}
+                        value={t.durationMin ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          const n = v === "" ? undefined : Math.max(1, Number(v));
+                          setTasks((prev) =>
+                            prev.map((x, idx) => (idx === i ? { ...x, durationMin: Number.isFinite(n) ? n : undefined } : x)),
+                          );
+                        }}
+                        placeholder="min"
+                        className="h-7 w-16 text-xs"
+                      />
+                      <span>min</span>
+                    </label>
                   </div>
                 </div>
               ))}
             </div>
 
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={addEmptyTask}
+              className="w-full justify-center gap-1.5 border border-dashed border-white/15 text-xs"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add another task
+            </Button>
+
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <div className="flex justify-between gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(2)}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setStep(3)}>
                 Back
               </Button>
               <div className="flex gap-2">

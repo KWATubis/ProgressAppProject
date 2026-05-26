@@ -71,6 +71,7 @@ model Profile {
   bodyMetrics       BodyMetric[]
   socialMetrics     SocialMetric[]
   incomeEntries     IncomeEntry[]
+  businessMetrics   BusinessMetric[]
   activityTypes     ActivityType[]
   onboardingSession OnboardingSession?
 }
@@ -86,22 +87,26 @@ model OnboardingSession {
 }
 
 model Goal {
-  id           String    @id @default(cuid())
-  profileId    String
-  profile      Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  pillar       Pillar
-  title        String
-  description  String?
-  targetDate   DateTime?
-  targetValue  Float?
-  currentValue Float?
-  startValue   Float?
-  unit         String?
-  metricKey    String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  tasks        Task[]
+  id             String        @id @default(cuid())
+  profileId      String
+  profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  activityTypeId String?
+  activityType   ActivityType? @relation(fields: [activityTypeId], references: [id], onDelete: SetNull)
+  pillar         Pillar
+  title          String
+  description    String?
+  targetDate     DateTime?
+  targetValue    Float?
+  currentValue   Float?
+  startValue     Float?
+  unit           String?
+  metricKey      String?
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  tasks          Task[]
+
+  @@index([profileId, activityTypeId])
 }
 
 model Task {
@@ -160,21 +165,23 @@ model TaskLog {
 }
 
 model ActivityType {
-  id             String           @id @default(cuid())
-  profileId      String
-  profile        Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  name           String
-  slug           String
-  icon           String?
-  pillar         Pillar           @default(HEALTH)
-  kind           ActivityKind
-  workoutPlan    WorkoutPlan?
-  sessions       WorkoutSession[]
-  tasks          Task[]
-  incomeEntries  IncomeEntry[]
-  socialMetrics  SocialMetric[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  profileId       String
+  profile         Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  name            String
+  slug            String
+  icon            String?
+  pillar          Pillar           @default(HEALTH)
+  kind            ActivityKind
+  workoutPlan     WorkoutPlan?
+  sessions        WorkoutSession[]
+  tasks           Task[]
+  goals           Goal[]
+  incomeEntries   IncomeEntry[]
+  socialMetrics   SocialMetric[]
+  businessMetrics BusinessMetric[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@unique([profileId, slug])
   @@index([profileId, pillar])
@@ -348,5 +355,22 @@ model IncomeEntry {
   description    String?
   createdAt      DateTime      @default(now())
 
+  @@index([profileId, activityTypeId])
+}
+
+model BusinessMetric {
+  id             String       @id @default(cuid())
+  profileId      String
+  profile        Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  activityTypeId String
+  activityType   ActivityType @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
+  date           DateTime
+  clients        Int?
+  leads          Int?
+  deals          Int?
+  notes          String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([activityTypeId, date])
   @@index([profileId, activityTypeId])
 }
