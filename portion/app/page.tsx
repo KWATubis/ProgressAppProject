@@ -31,6 +31,9 @@ export default function LandingPage() {
   const heroOpacity = useTransform(scrollYProgress, [0, 0.85], [1, 0]);
   const heroY = useTransform(scrollYProgress, [0, 1], [0, 80]);
 
+  const earnHardRef = useRef<HTMLDivElement>(null);
+  const earnHardInView = useInView(earnHardRef, { once: false, amount: 0.4 });
+
   const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     mouseX.set((e.clientX - rect.left) / rect.width - 0.5);
@@ -135,12 +138,11 @@ export default function LandingPage() {
               TRAIN HARD.
             </span>
           </SplitReveal>
-          <div className="overflow-hidden">
+          <div ref={earnHardRef} className="overflow-hidden">
             <motion.span
               initial={{ y: "105%", opacity: 0 }}
-              whileInView={{ y: "0%", opacity: 1 }}
-              viewport={{ once: false, amount: 0.4 }}
-              transition={{ duration: 0.9, ease: EASE, delay: 0.32 }}
+              animate={{ y: earnHardInView ? "0%" : "105%", opacity: earnHardInView ? 1 : 0 }}
+              transition={{ duration: 0.9, ease: EASE, delay: earnHardInView ? 0.32 : 0 }}
               className="block leading-[0.95] text-white/90"
               style={{
                 fontFamily: "var(--font-serif)",
@@ -382,13 +384,14 @@ export default function LandingPage() {
 /* ───────────────────────── Helpers ───────────────────────── */
 
 function SplitReveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: false, amount: 0.4 });
   return (
-    <div className="overflow-hidden">
+    <div ref={ref} className="overflow-hidden">
       <motion.div
         initial={{ y: "105%" }}
-        whileInView={{ y: "0%" }}
-        viewport={{ once: false, amount: 0.4 }}
-        transition={{ duration: 0.95, ease: EASE, delay }}
+        animate={{ y: inView ? "0%" : "105%" }}
+        transition={{ duration: 0.95, ease: EASE, delay: inView ? delay : 0 }}
       >
         {children}
       </motion.div>
