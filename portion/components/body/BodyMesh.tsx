@@ -87,6 +87,246 @@ function poseBone(
   if (euler.z != null) bone.rotation.z = euler.z;
 }
 
+// ---------- Muscle outline geometry helpers ----------
+type V3 = [number, number, number];
+
+function ellipseLoop(center: V3, axisU: V3, axisV: V3, segments = 32): V3[] {
+  const pts: V3[] = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = (i / segments) * Math.PI * 2;
+    const c = Math.cos(t);
+    const s = Math.sin(t);
+    pts.push([
+      center[0] + axisU[0] * c + axisV[0] * s,
+      center[1] + axisU[1] * c + axisV[1] * s,
+      center[2] + axisU[2] * c + axisV[2] * s,
+    ]);
+  }
+  return pts;
+}
+
+function roundedRectLoop(center: V3, halfW: number, halfH: number, radius: number, segments = 6): V3[] {
+  const z = center[2];
+  const cx = center[0];
+  const cy = center[1];
+  const r = Math.min(radius, halfW, halfH);
+  const pts: V3[] = [];
+  // 4 corner arcs
+  const corners: Array<[number, number, number, number]> = [
+    [cx + halfW - r, cy - halfH + r, Math.PI * 1.5, Math.PI * 2.0], // bottom-right
+    [cx + halfW - r, cy + halfH - r, 0, Math.PI * 0.5],             // top-right
+    [cx - halfW + r, cy + halfH - r, Math.PI * 0.5, Math.PI * 1.0], // top-left
+    [cx - halfW + r, cy - halfH + r, Math.PI * 1.0, Math.PI * 1.5], // bottom-left
+  ];
+  for (const [ax, ay, a0, a1] of corners) {
+    for (let i = 0; i <= segments; i++) {
+      const t = a0 + (a1 - a0) * (i / segments);
+      pts.push([ax + Math.cos(t) * r, ay + Math.sin(t) * r, z]);
+    }
+  }
+  pts.push(pts[0]); // close
+  return pts;
+}
+
+function linePath(...pts: V3[]): V3[] {
+  return pts;
+}
+
+/** Push every point of a path slightly along (x, 0, z) so the outline sits
+ * outside the body surface and reads cleanly. */
+function inflate(points: V3[], amount: number): V3[] {
+  return points.map(([x, y, z]) => {
+    const r = Math.hypot(x, z);
+    if (r < 1e-4) return [x, y, z];
+    return [x + (x / r) * amount, y, z + (z / r) * amount];
+  });
+}
+
+/** Convert an open polyline into LineSegments index pairs: N points → N-1 segments. */
+function pathToSegmentPositions(points: V3[], out: number[]) {
+  for (let i = 0; i < points.length - 1; i++) {
+    out.push(...points[i], ...points[i + 1]);
+  }
+}
+
+/**
+ * Anatomical muscle outlines, in WORLD coordinates of the baked body
+ * (arms-down, 1.88m tall, feet at y=0). Each entry contributes a polyline
+ * that gets converted to LineSegments and tinted by its muscle group.
+ */
+function buildMuscleOutlines(): Array<{ group: MuscleGroup; points: V3[] }> {
+  const out: Array<{ group: MuscleGroup; points: V3[] }> = [];
+
+  // ----- PECS -----
+  out.push({
+    group: "chest",
+    points: ellipseLoop([-0.085, 1.435, 0.118], [0.075, 0, 0.01], [0, 0.055, 0], 28),
+  });
+  out.push({
+    group: "chest",
+    points: ellipseLoop([0.085, 1.435, 0.118], [0.075, 0, -0.01], [0, 0.055, 0], 28),
+  });
+  // Pec sternum cleft
+  out.push({
+    group: "chest",
+    points: linePath([0, 1.49, 0.117], [0, 1.39, 0.122]),
+  });
+
+  // ----- ABS (6-pack) -----
+  const absRows = [1.33, 1.26, 1.19];
+  for (const yRow of absRows) {
+    out.push({
+      group: "abs",
+      points: roundedRectLoop([-0.04, yRow, 0.137], 0.032, 0.028, 0.012, 4),
+    });
+    out.push({
+      group: "abs",
+      points: roundedRectLoop([0.04, yRow, 0.137], 0.032, 0.028, 0.012, 4),
+    });
+  }
+  // Linea alba (vertical line down the middle)
+  out.push({
+    group: "abs",
+    points: linePath([0, 1.36, 0.138], [0, 1.16, 0.138]),
+  });
+  // Obliques (curves flanking the abs)
+  out.push({
+    group: "abs",
+    points: linePath(
+      [-0.085, 1.32, 0.105],
+      [-0.10, 1.27, 0.09],
+      [-0.105, 1.22, 0.08],
+      [-0.10, 1.16, 0.07],
+    ),
+  });
+  out.push({
+    group: "abs",
+    points: linePath(
+      [0.085, 1.32, 0.105],
+      [0.10, 1.27, 0.09],
+      [0.105, 1.22, 0.08],
+      [0.10, 1.16, 0.07],
+    ),
+  });
+  // Lower pec / chest-to-ab transition
+  out.push({
+    group: "chest",
+    points: linePath([-0.13, 1.40, 0.10], [-0.04, 1.38, 0.122]),
+  });
+  out.push({
+    group: "chest",
+    points: linePath([0.13, 1.40, 0.10], [0.04, 1.38, 0.122]),
+  });
+
+  // ----- DELTOIDS -----
+  out.push({
+    group: "shoulders",
+    points: ellipseLoop([-0.215, 1.52, 0.005], [0, 0, 0.075], [0, 0.06, 0], 28),
+  });
+  out.push({
+    group: "shoulders",
+    points: ellipseLoop([0.215, 1.52, 0.005], [0, 0, 0.075], [0, 0.06, 0], 28),
+  });
+
+  // ----- BICEPS -----
+  out.push({
+    group: "biceps",
+    points: ellipseLoop([-0.225, 1.33, 0.058], [0.042, 0, 0], [0, 0.082, 0], 26),
+  });
+  out.push({
+    group: "biceps",
+    points: ellipseLoop([0.225, 1.33, 0.058], [0.042, 0, 0], [0, 0.082, 0], 26),
+  });
+
+  // ----- TRICEPS -----
+  out.push({
+    group: "triceps",
+    points: ellipseLoop([-0.225, 1.33, -0.058], [0.042, 0, 0], [0, 0.085, 0], 26),
+  });
+  out.push({
+    group: "triceps",
+    points: ellipseLoop([0.225, 1.33, -0.058], [0.042, 0, 0], [0, 0.085, 0], 26),
+  });
+
+  // ----- FOREARMS -----
+  out.push({
+    group: "forearms",
+    points: ellipseLoop([-0.225, 1.07, 0.025], [0.04, 0, 0], [0, 0.095, 0], 24),
+  });
+  out.push({
+    group: "forearms",
+    points: ellipseLoop([0.225, 1.07, 0.025], [0.04, 0, 0], [0, 0.095, 0], 24),
+  });
+
+  // ----- LATS / BACK -----
+  out.push({
+    group: "back",
+    points: ellipseLoop([-0.10, 1.35, -0.128], [0.06, 0, 0], [0, 0.135, 0], 28),
+  });
+  out.push({
+    group: "back",
+    points: ellipseLoop([0.10, 1.35, -0.128], [0.06, 0, 0], [0, 0.135, 0], 28),
+  });
+  // Spine line
+  out.push({
+    group: "back",
+    points: linePath([0, 1.50, -0.13], [0, 1.55, -0.105], [0, 1.50, -0.13], [0, 1.10, -0.13]),
+  });
+
+  // ----- GLUTES -----
+  out.push({
+    group: "glutes",
+    points: ellipseLoop([-0.085, 0.93, -0.108], [0.07, 0, 0], [0, 0.08, 0], 26),
+  });
+  out.push({
+    group: "glutes",
+    points: ellipseLoop([0.085, 0.93, -0.108], [0.07, 0, 0], [0, 0.08, 0], 26),
+  });
+
+  // ----- QUADS (front of thigh) -----
+  out.push({
+    group: "quads",
+    points: ellipseLoop([-0.11, 0.62, 0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
+  });
+  out.push({
+    group: "quads",
+    points: ellipseLoop([0.11, 0.62, 0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
+  });
+  // Vastus medialis (inner-knee teardrop)
+  out.push({
+    group: "quads",
+    points: ellipseLoop([-0.08, 0.5, 0.085], [0.022, 0, 0], [0, 0.05, 0], 18),
+  });
+  out.push({
+    group: "quads",
+    points: ellipseLoop([0.08, 0.5, 0.085], [0.022, 0, 0], [0, 0.05, 0], 18),
+  });
+
+  // ----- HAMSTRINGS -----
+  out.push({
+    group: "hamstrings",
+    points: ellipseLoop([-0.11, 0.62, -0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
+  });
+  out.push({
+    group: "hamstrings",
+    points: ellipseLoop([0.11, 0.62, -0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
+  });
+
+  // ----- CALVES -----
+  out.push({
+    group: "calves",
+    points: ellipseLoop([-0.11, 0.27, -0.07], [0.04, 0, 0], [0, 0.085, 0], 24),
+  });
+  out.push({
+    group: "calves",
+    points: ellipseLoop([0.11, 0.27, -0.07], [0.04, 0, 0], [0, 0.085, 0], 24),
+  });
+
+  // Inflate every outline slightly so it floats off the body surface and
+  // doesn't z-fight with the underlying wireframe.
+  return out.map((o) => ({ ...o, points: inflate(o.points, 0.006) }));
+}
+
 /**
  * Reshape vertices for a more masculine V-taper. Operates AFTER bones are
  * baked — moves torso-only vertices (small |x|) so arms hanging at the sides
@@ -308,8 +548,8 @@ export function BodyMesh({
       skinMesh.frustumCulled = false;
       out.add(skinMesh);
 
-      // --- Edge lines: only contours, not every triangle ---
-      const edgesGeom = new THREE.EdgesGeometry(geom, 22); // 22° threshold
+      // --- Edge lines: contour + moderate detail ---
+      const edgesGeom = new THREE.EdgesGeometry(geom, 10); // 10° = light triangulation texture
       const edgePos = edgesGeom.getAttribute("position") as THREE.BufferAttribute;
       const edgeCount = edgePos.count;
       const edgeIndices = new Int8Array(edgeCount);
@@ -332,7 +572,7 @@ export function BodyMesh({
       const lineMat = new THREE.LineBasicMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.9,
+        opacity: 0.55,
         depthWrite: false,
         toneMapped: false,
         blending: THREE.NormalBlending,
@@ -343,6 +583,57 @@ export function BodyMesh({
       out.add(lines);
 
       perMesh.push({ skinIndices, skinColor, edgeIndices, edgeColor });
+    }
+
+    // ---- Muscle definition outlines (pec ovals, ab 6-pack, biceps, etc) ----
+    const outlines = buildMuscleOutlines();
+    const segPositions: number[] = [];
+    const segGroups: number[] = [];
+    for (const outline of outlines) {
+      const groupIdx = GROUP_INDEX[outline.group];
+      const startCount = segPositions.length / 3;
+      pathToSegmentPositions(outline.points, segPositions);
+      const endCount = segPositions.length / 3;
+      for (let i = startCount; i < endCount; i++) segGroups.push(groupIdx);
+    }
+    if (segPositions.length > 0) {
+      const outlineGeom = new THREE.BufferGeometry();
+      outlineGeom.setAttribute(
+        "position",
+        new THREE.BufferAttribute(new Float32Array(segPositions), 3),
+      );
+      const outlineCount = segPositions.length / 3;
+      const outlineColors = new Float32Array(outlineCount * 3);
+      const outlineIndices = new Int8Array(outlineCount);
+      for (let i = 0; i < outlineCount; i++) {
+        outlineIndices[i] = segGroups[i];
+        outlineColors[i * 3] = cyan.r;
+        outlineColors[i * 3 + 1] = cyan.g;
+        outlineColors[i * 3 + 2] = cyan.b;
+      }
+      const outlineColorAttr = new THREE.BufferAttribute(outlineColors, 3);
+      outlineGeom.setAttribute("color", outlineColorAttr);
+
+      const outlineMat = new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false,
+        toneMapped: false,
+        blending: THREE.NormalBlending,
+      });
+      const outlineLines = new THREE.LineSegments(outlineGeom, outlineMat);
+      outlineLines.renderOrder = 3;
+      outlineLines.frustumCulled = false;
+      out.add(outlineLines);
+
+      // Track outline colors as a fake "perMesh" entry so the recolor pass picks it up.
+      perMesh.push({
+        skinIndices: new Int8Array(0),
+        skinColor: new THREE.BufferAttribute(new Float32Array(0), 3),
+        edgeIndices: outlineIndices,
+        edgeColor: outlineColorAttr,
+      });
     }
 
     const s = targetHeight / ySize;
