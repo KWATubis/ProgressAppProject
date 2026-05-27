@@ -51,6 +51,7 @@ const planSchema = z.object({
               repRange: z.string().max(20).optional().nullable(),
               rir: z.number().int().min(0).max(10).optional().nullable(),
               notes: z.string().max(200).optional().nullable(),
+              customMetricId: z.string().optional().nullable(),
             }),
           )
           .min(1),
@@ -86,6 +87,30 @@ export async function POST(
     return NextResponse.json({ error: e instanceof Error ? e.message : "Invalid body" }, { status: 400 });
   }
 
+  // Defense-in-depth: only accept customMetricIds the user actually owns
+  // and that belong to this activity. The FK would catch ownership leaks
+  // but we want a clean 400 instead of a 500 if someone hand-crafts a body.
+  const incomingMetricIds = Array.from(
+    new Set(
+      body.days
+        .flatMap((d) => d.exercises)
+        .map((ex) => ex.customMetricId)
+        .filter((v): v is string => !!v),
+    ),
+  );
+  let validMetricIds = new Set<string>();
+  if (incomingMetricIds.length > 0) {
+    const found = await prisma.customMetric.findMany({
+      where: {
+        id: { in: incomingMetricIds },
+        profileId: user.id,
+        activityTypeId: activity.id,
+      },
+      select: { id: true },
+    });
+    validMetricIds = new Set(found.map((m) => m.id));
+  }
+
   // Replace any existing plan so editing is idempotent.
   if (activity.workoutPlan) {
     await prisma.workoutPlan.delete({ where: { id: activity.workoutPlan.id } });
@@ -110,6 +135,10 @@ export async function POST(
               rir: ex.rir ?? null,
               notes: ex.notes ?? null,
               sortOrder: ei,
+              customMetricId:
+                ex.customMetricId && validMetricIds.has(ex.customMetricId)
+                  ? ex.customMetricId
+                  : null,
             })),
           },
         })),

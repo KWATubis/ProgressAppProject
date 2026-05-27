@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { parseISODate } from "@/lib/utils/dates";
 import { autoTickActivityTask } from "@/lib/tasks/auto-tick";
+import { autoLogMetricEntries } from "@/lib/metrics/auto-log";
 
 const setSchema = z.object({
   setNumber: z.number().int().min(1),
@@ -140,6 +141,26 @@ export async function POST(req: Request) {
       activityTypeId: session.activityTypeId,
       date: session.date,
     });
+
+    // Mirror each logged set into a MetricEntry for any plan exercise
+    // that's been linked to a custom metric. Goal progress auto-updates
+    // through `withDerivedCurrent` on next page render.
+    const setsForAutoLog = exercises.flatMap((ex) =>
+      ex.sets.map((s) => ({
+        exerciseName: ex.name,
+        reps: s.reps ?? null,
+        weightKg: s.weightKg ?? null,
+        holdSeconds: s.holdSeconds ?? null,
+      })),
+    );
+    if (setsForAutoLog.length > 0) {
+      await autoLogMetricEntries({
+        profileId: user.id,
+        activityTypeId: session.activityTypeId,
+        date: session.date,
+        sets: setsForAutoLog,
+      });
+    }
   }
 
   return NextResponse.json({ session });

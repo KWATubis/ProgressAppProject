@@ -228,17 +228,21 @@ model WorkoutPlanDay {
 }
 
 model WorkoutPlanExercise {
-  id          String         @id @default(cuid())
-  dayId       String
-  day         WorkoutPlanDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
-  name        String
-  muscleGroup String
-  metric      ExerciseMetric @default(REPS)
-  targetSets  Int            @default(3)
-  repRange    String?
-  rir         Int?
-  notes       String?
-  sortOrder   Int            @default(0)
+  id             String         @id @default(cuid())
+  dayId          String
+  day            WorkoutPlanDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  name           String
+  muscleGroup    String
+  metric         ExerciseMetric @default(REPS)
+  targetSets     Int            @default(3)
+  repRange       String?
+  rir            Int?
+  notes          String?
+  sortOrder      Int            @default(0)
+  customMetricId String?
+  customMetric   CustomMetric?  @relation("ExerciseCustomMetric", fields: [customMetricId], references: [id], onDelete: SetNull)
+
+  @@index([customMetricId])
 }
 
 model WorkoutSession {
@@ -437,6 +441,7 @@ model CustomMetric {
   updatedAt      DateTime      @updatedAt
   entries        MetricEntry[]
   goals          Goal[]        @relation("GoalCustomMetric")
+  planExercises  WorkoutPlanExercise[] @relation("ExerciseCustomMetric")
 
   @@index([profileId])
   @@index([activityTypeId])
