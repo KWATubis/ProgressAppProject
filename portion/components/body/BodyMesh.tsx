@@ -6,12 +6,14 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 /**
- * Holographic body: translucent fresnel skin (additive) + bright wireframe overlay.
+ * Holographic body — translucent fresnel shell + cyan wireframe overlay.
  *
- * Implementation note: the source GLB (Mixamo X-Bot) uses SkinnedMesh, but our
- * custom shaders don't include skinning transforms — so we BAKE the bind-pose
- * geometry into plain non-skinned Meshes. That avoids the collapsed-to-origin
- * vertex problem you get when applying a non-skinning shader to a SkinnedMesh.
+ * The source GLB (Mixamo X-Bot) is a SkinnedMesh in T-pose. We:
+ *   1) Pose the arm bones DOWN so the figure stands naturally at attention.
+ *   2) Skin each vertex of the bind-pose geometry through the posed skeleton.
+ *   3) Build a static non-skinned Mesh from those world-space positions.
+ *
+ * This avoids needing a skinning-aware shader and gives us arms-at-sides.
  */
 
 type Props = {
@@ -36,6 +38,7 @@ const SKIN_VERT = /* glsl */ `
   }
 `;
 
+// Much dimmer than before — rim-only, almost invisible head-on.
 const SKIN_FRAG = /* glsl */ `
   precision highp float;
   uniform float uTime;
@@ -45,14 +48,31 @@ const SKIN_FRAG = /* glsl */ `
   varying vec3 vWorldPos;
   void main() {
     float NdotV = clamp(dot(normalize(vViewNormal), normalize(vViewDir)), 0.0, 1.0);
-    float fresnel = pow(1.0 - NdotV, 1.6);
-    // Drifting horizontal scan band.
-    float band = smoothstep(0.06, 0.0, abs(fract(uTime * 0.18) * 2.2 - vWorldPos.y));
-    vec3 col = uColor * (0.35 + fresnel * 1.8 + band * 0.7);
-    float alpha = clamp(fresnel * 0.7 + 0.18 + band * 0.4, 0.0, 0.92);
+    float fresnel = pow(1.0 - NdotV, 2.4);
+    float band = smoothstep(0.04, 0.0, abs(fract(uTime * 0.18) * 2.2 - vWorldPos.y));
+    vec3 col = uColor * (0.04 + fresnel * 0.55 + band * 0.18);
+    float alpha = clamp(fresnel * 0.35 + 0.03 + band * 0.12, 0.0, 0.55);
     gl_FragColor = vec4(col, alpha);
   }
 `;
+
+/** Rotate a named bone by Euler angles (radians). No-op if bone missing. */
+function poseBone(
+  skeleton: THREE.Skeleton,
+  needle: string,
+  euler: { x?: number; y?: number; z?: number },
+) {
+  const bone = skeleton.bones.find((b) =>
+    b.name.toLowerCase().includes(needle.toLowerCase()),
+  );
+  if (!bone) {
+    console.warn("Bone not found:", needle);
+    return;
+  }
+  if (euler.x != null) bone.rotation.x = euler.x;
+  if (euler.y != null) bone.rotation.y = euler.y;
+  if (euler.z != null) bone.rotation.z = euler.z;
+}
 
 export function BodyMesh({
   targetHeight = 1.88,
@@ -69,13 +89,6 @@ export function BodyMesh({
 
   const gltf = useGLTF("/models/body.glb");
 
-  /**
-   * Walk the GLB, pull every SkinnedMesh / Mesh, and rebuild a clean Group
-   * containing two plain Mesh instances per source mesh:
-   *   1) skin material  (fresnel additive shell)
-   *   2) wire material  (cyan wireframe)
-   * Both share the SAME geometry, baked into world-space at load time.
-   */
   const { group, scale, offset } = useMemo(() => {
     if (!gltf?.scene) {
       return { group: null, scale: 1, offset: new THREE.Vector3() };
@@ -83,11 +96,39 @@ export function BodyMesh({
 
     gltf.scene.updateMatrixWorld(true);
 
-    const skinUniforms = skinUniformsRef.current;
+    // ---- Pose the skeleton: arms down, slight forward droop ----
+    // Mixamo bones go LeftArm → LeftForeArm → LeftHand. In T-pose, LeftArm
+    // extends along +X. Rotating it around Z brings the arm down.
+    let posedSkeleton: THREE.Skeleton | null = null;
+    gltf.scene.traverse((obj) => {
+      const sm = obj as THREE.SkinnedMesh;
+      if (sm.isSkinnedMesh && sm.skeleton && !posedSkeleton) {
+        posedSkeleton = sm.skeleton;
+        const names = sm.skeleton.bones.map((b) => b.name);
+        console.log("Skeleton bones:", names);
+      }
+    });
+
+    if (posedSkeleton) {
+      // The amount and axis depend on the skeleton's coordinate convention.
+      // Mixamo: rotating Z by -PI/2 on LeftArm brings it from T-pose to down.
+      poseBone(posedSkeleton, "LeftArm", { z: -Math.PI / 2 + 0.18 });
+      poseBone(posedSkeleton, "RightArm", { z: Math.PI / 2 - 0.18 });
+      // Small bend at elbow for a relaxed pose.
+      poseBone(posedSkeleton, "LeftForeArm", { y: 0.15 });
+      poseBone(posedSkeleton, "RightForeArm", { y: -0.15 });
+      // Refresh world matrices through the chain.
+      (posedSkeleton as THREE.Skeleton).bones.forEach((b) =>
+        b.updateMatrixWorld(true),
+      );
+      (posedSkeleton as THREE.Skeleton).update();
+    }
+
+    // ---- Bake each SkinnedMesh into a static skinned-position geometry ----
     const skinMat = new THREE.ShaderMaterial({
       vertexShader: SKIN_VERT,
       fragmentShader: SKIN_FRAG,
-      uniforms: skinUniforms,
+      uniforms: skinUniformsRef.current,
       transparent: true,
       depthWrite: false,
       toneMapped: false,
@@ -98,7 +139,7 @@ export function BodyMesh({
       color: new THREE.Color(color),
       wireframe: true,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.32, // way dimmer than before
       depthWrite: false,
       toneMapped: false,
       blending: THREE.AdditiveBlending,
@@ -107,17 +148,35 @@ export function BodyMesh({
 
     const out = new THREE.Group();
     let meshCount = 0;
+    const tempVec = new THREE.Vector3();
 
     gltf.scene.traverse((obj) => {
-      const src = obj as THREE.Mesh | THREE.SkinnedMesh;
-      if (!(src as THREE.Mesh).isMesh && !(src as THREE.SkinnedMesh).isSkinnedMesh) {
-        return;
+      const skinned = obj as THREE.SkinnedMesh;
+      const plain = obj as THREE.Mesh;
+      const isSkinned = !!skinned.isSkinnedMesh;
+      if (!plain.isMesh && !isSkinned) return;
+
+      let geom: THREE.BufferGeometry;
+      if (isSkinned) {
+        // Bake every vertex through the posed skeleton.
+        skinned.updateMatrixWorld(true);
+        const src = skinned.geometry as THREE.BufferGeometry;
+        const baked = src.clone();
+        const positionAttr = baked.getAttribute("position") as THREE.BufferAttribute;
+        for (let i = 0; i < positionAttr.count; i++) {
+          tempVec.fromBufferAttribute(positionAttr, i);
+          skinned.applyBoneTransform(i, tempVec);
+          // applyBoneTransform returns the result in mesh-local space.
+          positionAttr.setXYZ(i, tempVec.x, tempVec.y, tempVec.z);
+        }
+        positionAttr.needsUpdate = true;
+        baked.computeVertexNormals();
+        baked.applyMatrix4(skinned.matrixWorld);
+        geom = baked;
+      } else {
+        geom = (plain.geometry as THREE.BufferGeometry).clone();
+        geom.applyMatrix4(plain.matrixWorld);
       }
-      const geom = (src.geometry as THREE.BufferGeometry).clone();
-      // Bake the source mesh's world transform into the geometry so we don't
-      // depend on a bone hierarchy. Result is a static bind-pose mesh.
-      const worldMatrix = src.matrixWorld.clone();
-      geom.applyMatrix4(worldMatrix);
       geom.computeBoundingBox();
       geom.computeBoundingSphere();
 
@@ -134,7 +193,6 @@ export function BodyMesh({
       meshCount++;
     });
 
-    // Now measure the rebuilt group and compute scale/offset to hit targetHeight.
     out.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(out);
     const size = new THREE.Vector3();

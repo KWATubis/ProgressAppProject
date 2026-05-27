@@ -70,24 +70,21 @@ const PLATES: Plate[] = [
   { group: "glutes", position: [-0.085, 0.92, -0.11], scale: [0.075, 0.085, 0.045] },
   { group: "glutes", position: [0.085, 0.92, -0.11], scale: [0.075, 0.085, 0.045] },
 
-  // Shoulders — deltoid caps
-  { group: "shoulders", position: [-0.255, 1.5, 0.02], scale: [0.07, 0.06, 0.07] },
-  { group: "shoulders", position: [0.255, 1.5, 0.02], scale: [0.07, 0.06, 0.07] },
-  // Rear deltoid hint
-  { group: "shoulders", position: [-0.235, 1.5, -0.05], scale: [0.05, 0.05, 0.04] },
-  { group: "shoulders", position: [0.235, 1.5, -0.05], scale: [0.05, 0.05, 0.04] },
+  // Shoulders — deltoid caps (arms now hang at sides, so deltoids sit at top of shoulder)
+  { group: "shoulders", position: [-0.21, 1.52, 0.0], scale: [0.06, 0.07, 0.07] },
+  { group: "shoulders", position: [0.21, 1.52, 0.0], scale: [0.06, 0.07, 0.07] },
 
-  // Biceps — front of horizontal upper arm
-  { group: "biceps", position: [-0.42, 1.46, 0.045], scale: [0.07, 0.045, 0.04], rotation: [0, 0, 0] },
-  { group: "biceps", position: [0.42, 1.46, 0.045], scale: [0.07, 0.045, 0.04], rotation: [0, 0, 0] },
+  // Biceps — upper arm hangs vertically along the body
+  { group: "biceps", position: [-0.22, 1.32, 0.05], scale: [0.045, 0.08, 0.04] },
+  { group: "biceps", position: [0.22, 1.32, 0.05], scale: [0.045, 0.08, 0.04] },
 
-  // Triceps — back of horizontal upper arm
-  { group: "triceps", position: [-0.42, 1.46, -0.05], scale: [0.075, 0.045, 0.04] },
-  { group: "triceps", position: [0.42, 1.46, -0.05], scale: [0.075, 0.045, 0.04] },
+  // Triceps — back of upper arm
+  { group: "triceps", position: [-0.22, 1.32, -0.05], scale: [0.045, 0.085, 0.04] },
+  { group: "triceps", position: [0.22, 1.32, -0.05], scale: [0.045, 0.085, 0.04] },
 
-  // Forearms — past elbow
-  { group: "forearms", position: [-0.66, 1.46, 0.0], scale: [0.085, 0.04, 0.04] },
-  { group: "forearms", position: [0.66, 1.46, 0.0], scale: [0.085, 0.04, 0.04] },
+  // Forearms — lower arm hanging down
+  { group: "forearms", position: [-0.22, 1.1, 0.02], scale: [0.04, 0.09, 0.04] },
+  { group: "forearms", position: [0.22, 1.1, 0.02], scale: [0.04, 0.09, 0.04] },
 
   // Quads — front of upper leg; vastus lateralis + medialis + rectus
   { group: "quads", position: [-0.11, 0.65, 0.075], scale: [0.06, 0.13, 0.045], rotation: [0, 0, 0.04] },
@@ -120,14 +117,14 @@ const HITBOXES: Hitbox[] = [
   { group: "abs", position: [0, 1.25, 0.13], radius: 0.14 },
   { group: "back", position: [0, 1.42, -0.13], radius: 0.18 },
   { group: "glutes", position: [0, 0.92, -0.11], radius: 0.13 },
-  { group: "shoulders", position: [-0.25, 1.5, 0], radius: 0.09 },
-  { group: "shoulders", position: [0.25, 1.5, 0], radius: 0.09 },
-  { group: "biceps", position: [-0.42, 1.46, 0.05], radius: 0.09 },
-  { group: "biceps", position: [0.42, 1.46, 0.05], radius: 0.09 },
-  { group: "triceps", position: [-0.42, 1.46, -0.05], radius: 0.09 },
-  { group: "triceps", position: [0.42, 1.46, -0.05], radius: 0.09 },
-  { group: "forearms", position: [-0.66, 1.46, 0], radius: 0.1 },
-  { group: "forearms", position: [0.66, 1.46, 0], radius: 0.1 },
+  { group: "shoulders", position: [-0.21, 1.52, 0], radius: 0.09 },
+  { group: "shoulders", position: [0.21, 1.52, 0], radius: 0.09 },
+  { group: "biceps", position: [-0.22, 1.32, 0.05], radius: 0.09 },
+  { group: "biceps", position: [0.22, 1.32, 0.05], radius: 0.09 },
+  { group: "triceps", position: [-0.22, 1.32, -0.05], radius: 0.09 },
+  { group: "triceps", position: [0.22, 1.32, -0.05], radius: 0.09 },
+  { group: "forearms", position: [-0.22, 1.1, 0.02], radius: 0.1 },
+  { group: "forearms", position: [0.22, 1.1, 0.02], radius: 0.1 },
   { group: "quads", position: [-0.11, 0.62, 0.08], radius: 0.13 },
   { group: "quads", position: [0.11, 0.62, 0.08], radius: 0.13 },
   { group: "hamstrings", position: [-0.11, 0.62, -0.08], radius: 0.13 },
@@ -165,7 +162,7 @@ function MusclePlate({
   // Base brightness: visible even when fully rested (so muscle definition shows).
   // Adds extra glow when fatigued / hovered / selected.
   const targetStrength =
-    0.5 + fatigue * 0.7 + (isHovered ? 0.55 : 0) + (isSelected ? 0.85 : 0);
+    0.28 + fatigue * 0.5 + (isHovered ? 0.4 : 0) + (isSelected ? 0.6 : 0);
 
   useFrame((state) => {
     if (!matRef.current) return;
