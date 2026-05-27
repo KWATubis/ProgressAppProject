@@ -4,58 +4,104 @@ import { useEffect, useMemo, useRef } from "react";
 import { useGLTF } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import {
+  MUSCLE_GROUPS,
+  type MuscleGroup,
+  type MuscleState,
+  tirednessColor,
+} from "@/lib/body/muscle-state";
 
 /**
- * Holographic body — translucent fresnel shell + cyan wireframe overlay.
+ * Holographic wireframe body that's color-coded per muscle region.
  *
- * The source GLB (Mixamo X-Bot) is a SkinnedMesh in T-pose. We:
- *   1) Pose the arm bones DOWN so the figure stands naturally at attention.
- *   2) Skin each vertex of the bind-pose geometry through the posed skeleton.
- *   3) Build a static non-skinned Mesh from those world-space positions.
+ * Pipeline:
+ *   1) Pose the X-Bot skeleton (arms down) and bake skinned vertices into a
+ *      static, non-skinned BufferGeometry so we can use plain shaders.
+ *   2) For every vertex, classify which muscle group it belongs to by its
+ *      normalized body coordinates (e.g. y∈[0..1] feet→head).
+ *   3) Build a vertex color attribute. When muscleStates change, recolor each
+ *      vertex by its group's recovery color (green=rested → red=just trained).
+ *   4) Render the geometry twice: once as a thin fresnel skin shell, once as
+ *      wireframe — both use the SAME vertex colors so the muscle regions are
+ *      visible as colored wireframe zones in the manikin itself (no floating
+ *      plates).
  *
- * This avoids needing a skinning-aware shader and gives us arms-at-sides.
+ * Hover/select gets passed in and is boosted on top of the base recovery color
+ * so the active muscle pops without being a separate floating object.
  */
 
 type Props = {
   targetHeight?: number;
   floorY?: number;
-  color?: string;
+  baseColor?: string;
+  muscleStates: Record<MuscleGroup, MuscleState>;
+  hoveredGroup?: MuscleGroup | null;
+  selectedGroup?: MuscleGroup | null;
 };
 
 useGLTF.preload("/models/body.glb");
 
-const SKIN_VERT = /* glsl */ `
-  varying vec3 vViewNormal;
-  varying vec3 vViewDir;
-  varying vec3 vWorldPos;
-  void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPos = worldPos.xyz;
-    vec4 viewPos = viewMatrix * worldPos;
-    vViewNormal = normalize(normalMatrix * normal);
-    vViewDir = normalize(-viewPos.xyz);
-    gl_Position = projectionMatrix * viewPos;
-  }
-`;
+const NEUTRAL = -1;
+const GROUP_INDEX: Record<MuscleGroup, number> = MUSCLE_GROUPS.reduce(
+  (acc, g, i) => {
+    acc[g] = i;
+    return acc;
+  },
+  {} as Record<MuscleGroup, number>,
+);
 
-// Barely-there: thin rim only, no scan band, very low alpha.
-const SKIN_FRAG = /* glsl */ `
-  precision highp float;
-  uniform float uTime;
-  uniform vec3  uColor;
-  varying vec3 vViewNormal;
-  varying vec3 vViewDir;
-  varying vec3 vWorldPos;
-  void main() {
-    float NdotV = clamp(dot(normalize(vViewNormal), normalize(vViewDir)), 0.0, 1.0);
-    float fresnel = pow(1.0 - NdotV, 3.0);
-    vec3 col = uColor * (0.02 + fresnel * 0.22);
-    float alpha = clamp(fresnel * 0.18 + 0.015, 0.0, 0.3);
-    gl_FragColor = vec4(col, alpha);
-  }
-`;
+/**
+ * Classify a vertex by its position relative to the body's bounding box.
+ * Inputs are NORMALIZED:
+ *   nx ∈ [-1, +1]  body half-widths, +x = left side of body
+ *   ny ∈ [ 0, +1]  feet → top of head
+ *   nz ∈ [-1, +1]  back → front
+ * Returns a muscle group index, or NEUTRAL for head/hands/feet (stays cyan).
+ */
+function classifyVertex(nx: number, ny: number, nz: number): number {
+  // Head and upper neck
+  if (ny > 0.86) return NEUTRAL;
+  // Feet
+  if (ny < 0.04) return NEUTRAL;
+  // Hands (low + far from body center)
+  if (ny < 0.52 && Math.abs(nx) > 0.55) return NEUTRAL;
 
-/** Rotate a named bone by Euler angles (radians). No-op if bone missing. */
+  const ax = Math.abs(nx);
+
+  // ARMS — at the sides, so any vertex with large |x| in arm range is arm
+  if (ax > 0.42) {
+    if (ny > 0.78) return GROUP_INDEX.shoulders;
+    if (ny > 0.62) return nz >= 0 ? GROUP_INDEX.biceps : GROUP_INDEX.triceps;
+    return GROUP_INDEX.forearms;
+  }
+
+  // TORSO
+  if (ny > 0.74) {
+    // Upper chest / upper back
+    return nz >= 0 ? GROUP_INDEX.chest : GROUP_INDEX.back;
+  }
+  if (ny > 0.56) {
+    // Abs / mid back
+    return nz >= 0 ? GROUP_INDEX.abs : GROUP_INDEX.back;
+  }
+
+  // HIPS / GLUTES band
+  if (ny > 0.48) {
+    if (nz < -0.05) return GROUP_INDEX.glutes;
+    return NEUTRAL;
+  }
+
+  // LEGS
+  if (ny > 0.22) {
+    return nz >= 0 ? GROUP_INDEX.quads : GROUP_INDEX.hamstrings;
+  }
+  if (ny > 0.04) {
+    return GROUP_INDEX.calves;
+  }
+
+  return NEUTRAL;
+}
+
 function poseBone(
   skeleton: THREE.Skeleton,
   needle: string,
@@ -64,90 +110,89 @@ function poseBone(
   const bone = skeleton.bones.find((b) =>
     b.name.toLowerCase().includes(needle.toLowerCase()),
   );
-  if (!bone) {
-    console.warn("Bone not found:", needle);
-    return;
-  }
+  if (!bone) return;
   if (euler.x != null) bone.rotation.x = euler.x;
   if (euler.y != null) bone.rotation.y = euler.y;
   if (euler.z != null) bone.rotation.z = euler.z;
 }
 
+const SKIN_VERT = /* glsl */ `
+  varying vec3 vColor;
+  varying vec3 vViewNormal;
+  varying vec3 vViewDir;
+  void main() {
+    vColor = color;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vec4 viewPos = viewMatrix * worldPos;
+    vViewNormal = normalize(normalMatrix * normal);
+    vViewDir = normalize(-viewPos.xyz);
+    gl_Position = projectionMatrix * viewPos;
+  }
+`;
+
+const SKIN_FRAG = /* glsl */ `
+  precision highp float;
+  varying vec3 vColor;
+  varying vec3 vViewNormal;
+  varying vec3 vViewDir;
+  void main() {
+    float NdotV = clamp(dot(normalize(vViewNormal), normalize(vViewDir)), 0.0, 1.0);
+    float fresnel = pow(1.0 - NdotV, 2.6);
+    vec3 col = vColor * (0.02 + fresnel * 0.35);
+    float alpha = clamp(fresnel * 0.25 + 0.02, 0.0, 0.4);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
 export function BodyMesh({
   targetHeight = 1.88,
   floorY = 0,
-  color = "#5be3ff",
+  baseColor = "#5be3ff",
+  muscleStates,
+  hoveredGroup = null,
+  selectedGroup = null,
 }: Props) {
-  const skinUniformsRef = useRef<{
-    uTime: { value: number };
-    uColor: { value: THREE.Color };
-  }>({
-    uTime: { value: 0 },
-    uColor: { value: new THREE.Color(color) },
-  });
-
   const gltf = useGLTF("/models/body.glb");
 
-  const { group, scale, offset } = useMemo(() => {
+  // ---------- Build static group + classify vertices (runs once per GLB) ----------
+  const { group, perMesh, scale, offset } = useMemo(() => {
     if (!gltf?.scene) {
-      return { group: null, scale: 1, offset: new THREE.Vector3() };
+      return {
+        group: null as THREE.Group | null,
+        perMesh: [] as Array<{
+          indices: Int8Array;
+          colorAttr: THREE.BufferAttribute;
+        }>,
+        scale: 1,
+        offset: new THREE.Vector3(),
+      };
     }
 
     gltf.scene.updateMatrixWorld(true);
 
-    // ---- Pose the skeleton: arms down, slight forward droop ----
-    // Mixamo bones go LeftArm → LeftForeArm → LeftHand. In T-pose, LeftArm
-    // extends along +X. Rotating it around Z brings the arm down.
+    // Pose bones: arms down
     let posedSkeleton: THREE.Skeleton | null = null;
     gltf.scene.traverse((obj) => {
       const sm = obj as THREE.SkinnedMesh;
       if (sm.isSkinnedMesh && sm.skeleton && !posedSkeleton) {
         posedSkeleton = sm.skeleton;
-        const names = sm.skeleton.bones.map((b) => b.name);
-        console.log("Skeleton bones:", names);
       }
     });
-
     if (posedSkeleton) {
-      // The amount and axis depend on the skeleton's coordinate convention.
-      // Mixamo: rotating Z by -PI/2 on LeftArm brings it from T-pose to down.
-      poseBone(posedSkeleton, "LeftArm", { z: -Math.PI / 2 + 0.18 });
-      poseBone(posedSkeleton, "RightArm", { z: Math.PI / 2 - 0.18 });
-      // Small bend at elbow for a relaxed pose.
-      poseBone(posedSkeleton, "LeftForeArm", { y: 0.15 });
-      poseBone(posedSkeleton, "RightForeArm", { y: -0.15 });
-      // Refresh world matrices through the chain.
+      poseBone(posedSkeleton, "LeftArm", { z: -Math.PI / 2 + 0.16 });
+      poseBone(posedSkeleton, "RightArm", { z: Math.PI / 2 - 0.16 });
+      poseBone(posedSkeleton, "LeftForeArm", { y: 0.12 });
+      poseBone(posedSkeleton, "RightForeArm", { y: -0.12 });
       (posedSkeleton as THREE.Skeleton).bones.forEach((b) =>
         b.updateMatrixWorld(true),
       );
       (posedSkeleton as THREE.Skeleton).update();
     }
 
-    // ---- Bake each SkinnedMesh into a static skinned-position geometry ----
-    const skinMat = new THREE.ShaderMaterial({
-      vertexShader: SKIN_VERT,
-      fragmentShader: SKIN_FRAG,
-      uniforms: skinUniformsRef.current,
-      transparent: true,
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-    });
-    const wireMat = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(color),
-      wireframe: true,
-      transparent: true,
-      opacity: 0.45, // normal blending keeps lines crisp without bloom halo
-      depthWrite: false,
-      toneMapped: false,
-      blending: THREE.NormalBlending,
-      side: THREE.FrontSide,
-    });
-
+    // Bake skinned vertices → static geometries
     const out = new THREE.Group();
-    let meshCount = 0;
     const tempVec = new THREE.Vector3();
+    const baked: THREE.BufferGeometry[] = [];
 
     gltf.scene.traverse((obj) => {
       const skinned = obj as THREE.SkinnedMesh;
@@ -157,27 +202,90 @@ export function BodyMesh({
 
       let geom: THREE.BufferGeometry;
       if (isSkinned) {
-        // Bake every vertex through the posed skeleton.
         skinned.updateMatrixWorld(true);
         const src = skinned.geometry as THREE.BufferGeometry;
-        const baked = src.clone();
-        const positionAttr = baked.getAttribute("position") as THREE.BufferAttribute;
-        for (let i = 0; i < positionAttr.count; i++) {
-          tempVec.fromBufferAttribute(positionAttr, i);
+        const g = src.clone();
+        const posAttr = g.getAttribute("position") as THREE.BufferAttribute;
+        for (let i = 0; i < posAttr.count; i++) {
+          tempVec.fromBufferAttribute(posAttr, i);
           skinned.applyBoneTransform(i, tempVec);
-          // applyBoneTransform returns the result in mesh-local space.
-          positionAttr.setXYZ(i, tempVec.x, tempVec.y, tempVec.z);
+          posAttr.setXYZ(i, tempVec.x, tempVec.y, tempVec.z);
         }
-        positionAttr.needsUpdate = true;
-        baked.computeVertexNormals();
-        baked.applyMatrix4(skinned.matrixWorld);
-        geom = baked;
+        posAttr.needsUpdate = true;
+        g.computeVertexNormals();
+        g.applyMatrix4(skinned.matrixWorld);
+        geom = g;
       } else {
         geom = (plain.geometry as THREE.BufferGeometry).clone();
         geom.applyMatrix4(plain.matrixWorld);
       }
       geom.computeBoundingBox();
-      geom.computeBoundingSphere();
+      baked.push(geom);
+    });
+
+    // Single combined bbox in baked space
+    const totalBox = new THREE.Box3();
+    for (const g of baked) {
+      if (g.boundingBox) totalBox.union(g.boundingBox);
+    }
+    const size = new THREE.Vector3();
+    totalBox.getSize(size);
+    const center = new THREE.Vector3();
+    totalBox.getCenter(center);
+    const halfX = (size.x / 2) || 1;
+    const halfZ = (size.z / 2) || 1;
+    const yMin = totalBox.min.y;
+    const ySize = size.y || 1;
+
+    // Build per-mesh: classification indices + initial cyan vertex colors
+    const cyan = new THREE.Color(baseColor);
+    const perMesh: Array<{
+      indices: Int8Array;
+      colorAttr: THREE.BufferAttribute;
+    }> = [];
+
+    for (const geom of baked) {
+      const posAttr = geom.getAttribute("position") as THREE.BufferAttribute;
+      const count = posAttr.count;
+      const indices = new Int8Array(count);
+      const colors = new Float32Array(count * 3);
+
+      for (let i = 0; i < count; i++) {
+        const x = posAttr.getX(i);
+        const y = posAttr.getY(i);
+        const z = posAttr.getZ(i);
+        const nx = (x - center.x) / halfX;
+        const ny = (y - yMin) / ySize;
+        const nz = (z - center.z) / halfZ;
+        indices[i] = classifyVertex(nx, ny, nz);
+        colors[i * 3 + 0] = cyan.r;
+        colors[i * 3 + 1] = cyan.g;
+        colors[i * 3 + 2] = cyan.b;
+      }
+
+      const colorAttr = new THREE.BufferAttribute(colors, 3);
+      geom.setAttribute("color", colorAttr);
+
+      const skinMat = new THREE.ShaderMaterial({
+        vertexShader: SKIN_VERT,
+        fragmentShader: SKIN_FRAG,
+        vertexColors: true,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+      });
+      const wireMat = new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false,
+        toneMapped: false,
+        blending: THREE.NormalBlending,
+        side: THREE.FrontSide,
+      });
 
       const skinMesh = new THREE.Mesh(geom, skinMat);
       skinMesh.renderOrder = 0;
@@ -189,33 +297,57 @@ export function BodyMesh({
       wireMesh.frustumCulled = false;
       out.add(wireMesh);
 
-      meshCount++;
-    });
+      perMesh.push({ indices, colorAttr });
+    }
 
-    out.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(out);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const center = new THREE.Vector3();
-    box.getCenter(center);
-    const s = targetHeight / (size.y || 1);
-
-    console.log("BodyMesh: baked", meshCount, "meshes, height=", size.y, "scale=", s);
-
+    const s = targetHeight / ySize;
     return {
       group: out,
+      perMesh,
       scale: s,
-      offset: new THREE.Vector3(-center.x * s, floorY - box.min.y * s, -center.z * s),
+      offset: new THREE.Vector3(-center.x * s, floorY - yMin * s, -center.z * s),
     };
-  }, [gltf, targetHeight, floorY, color]);
+  }, [gltf, targetHeight, floorY, baseColor]);
 
+  // ---------- Recolor vertices when state / hover / select changes ----------
   useEffect(() => {
-    skinUniformsRef.current.uColor.value.set(color);
-  }, [color]);
+    if (!perMesh.length) return;
 
-  useFrame((state) => {
-    skinUniformsRef.current.uTime.value = state.clock.getElapsedTime();
-  });
+    const groupColors = MUSCLE_GROUPS.map(
+      (g) => new THREE.Color(tirednessColor(muscleStates[g]?.hoursSince ?? null)),
+    );
+    const neutralColor = new THREE.Color(baseColor);
+    const hoverIdx = hoveredGroup ? GROUP_INDEX[hoveredGroup] : -2;
+    const selectIdx = selectedGroup ? GROUP_INDEX[selectedGroup] : -2;
+    const boost = new THREE.Color();
+
+    for (const { indices, colorAttr } of perMesh) {
+      const colors = colorAttr.array as Float32Array;
+      for (let i = 0; i < indices.length; i++) {
+        const g = indices[i];
+        let col: THREE.Color;
+        if (g === NEUTRAL) {
+          col = neutralColor;
+        } else {
+          col = groupColors[g];
+          if (g === selectIdx) {
+            boost.copy(col).lerp(new THREE.Color("#ffffff"), 0.45);
+            col = boost;
+          } else if (g === hoverIdx) {
+            boost.copy(col).multiplyScalar(1.55);
+            col = boost;
+          }
+        }
+        colors[i * 3 + 0] = col.r;
+        colors[i * 3 + 1] = col.g;
+        colors[i * 3 + 2] = col.b;
+      }
+      colorAttr.needsUpdate = true;
+    }
+  }, [perMesh, muscleStates, hoveredGroup, selectedGroup, baseColor]);
+
+  // gentle breathing already handled by parent
+  useFrame(() => {});
 
   if (!group) return null;
 
