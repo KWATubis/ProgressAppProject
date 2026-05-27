@@ -145,6 +145,7 @@ export default async function ActivityPage({
               targetSets: ex.targetSets,
               repRange: ex.repRange,
               rir: ex.rir,
+              customMetricId: ex.customMetricId,
             })),
           })),
         }
@@ -182,7 +183,12 @@ export default async function ActivityPage({
           </section>
         )}
 
-        <PlanSection slug={activity.slug} activityName={activity.name} initial={planInitial} />
+        <PlanSection
+          slug={activity.slug}
+          activityName={activity.name}
+          initial={planInitial}
+          customMetrics={customMetrics}
+        />
 
         {/* Session history */}
         <section className="space-y-2">

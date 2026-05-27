@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X, Trash2 } from "lucide-react";
+import { Plus, Target, X, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MuscleGroupPicker } from "./MuscleGroupPicker";
+import type { CustomMetricLite } from "@/components/metrics/CreateCustomMetricDialog";
 
 type ExerciseRow = {
   name: string;
@@ -15,12 +16,13 @@ type ExerciseRow = {
   targetSets: string;
   repRange: string;
   rir: string;
+  customMetricId: string;
 };
 
 type DayRow = { label: string; exercises: ExerciseRow[] };
 
 function blankExercise(): ExerciseRow {
-  return { name: "", muscles: [], metric: "REPS", targetSets: "3", repRange: "", rir: "" };
+  return { name: "", muscles: [], metric: "REPS", targetSets: "3", repRange: "", rir: "", customMetricId: "" };
 }
 
 function blankDay(label: string): DayRow {
@@ -32,18 +34,20 @@ const input =
 
 export type PlanInitial = {
   name: string;
-  days: { label: string; exercises: { name: string; muscleGroup: string; metric: "REPS" | "TIME"; targetSets: number; repRange: string | null; rir: number | null }[] }[];
+  days: { label: string; exercises: { name: string; muscleGroup: string; metric: "REPS" | "TIME"; targetSets: number; repRange: string | null; rir: number | null; customMetricId: string | null }[] }[];
 };
 
 export function PlanEditor({
   slug,
   activityName,
   initial,
+  customMetrics,
   onSaved,
 }: {
   slug: string;
   activityName: string;
   initial?: PlanInitial;
+  customMetrics: CustomMetricLite[];
   onSaved?: () => void;
 }) {
   const router = useRouter();
@@ -59,6 +63,7 @@ export function PlanEditor({
             targetSets: String(ex.targetSets),
             repRange: ex.repRange ?? "",
             rir: ex.rir == null ? "" : String(ex.rir),
+            customMetricId: ex.customMetricId ?? "",
           })),
         }))
       : [blankDay("Day 1")],
@@ -74,7 +79,7 @@ export function PlanEditor({
   function removeDay(di: number) {
     setDays((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== di) : prev));
   }
-  function updateExercise(di: number, ei: number, field: "name" | "metric" | "targetSets" | "repRange" | "rir", value: string) {
+  function updateExercise(di: number, ei: number, field: "name" | "metric" | "targetSets" | "repRange" | "rir" | "customMetricId", value: string) {
     setDays((prev) =>
       prev.map((d, i) =>
         i === di
@@ -120,6 +125,7 @@ export function PlanEditor({
             targetSets: Number(ex.targetSets) || 3,
             repRange: ex.repRange.trim() || null,
             rir: ex.rir === "" ? null : Number(ex.rir),
+            customMetricId: ex.customMetricId || null,
           })),
       }))
       .filter((d) => d.label && d.exercises.length > 0);
@@ -237,6 +243,24 @@ export function PlanEditor({
                   />
                   <span className="text-xs text-muted-foreground">{ex.metric === "TIME" ? "hold" : "reps"}</span>
                 </div>
+                {customMetrics.length > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Target className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <span className="shrink-0 text-muted-foreground">Tracks</span>
+                    <select
+                      className="h-8 flex-1 rounded-md border bg-background px-2 text-xs outline-none focus:border-foreground"
+                      value={ex.customMetricId}
+                      onChange={(e) => updateExercise(di, ei, "customMetricId", e.target.value)}
+                    >
+                      <option value="">— None —</option>
+                      {customMetrics.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.title} ({m.unit}, {m.aggregation.toLowerCase()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             ))}
             <button

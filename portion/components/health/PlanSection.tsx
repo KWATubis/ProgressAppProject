@@ -4,15 +4,18 @@ import { useState } from "react";
 import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PlanEditor, type PlanInitial } from "./PlanEditor";
+import type { CustomMetricLite } from "@/components/metrics/CreateCustomMetricDialog";
 
 export function PlanSection({
   slug,
   activityName,
   initial,
+  customMetrics,
 }: {
   slug: string;
   activityName: string;
   initial: PlanInitial | null;
+  customMetrics: CustomMetricLite[];
 }) {
   const [editing, setEditing] = useState(false);
 
@@ -31,6 +34,7 @@ export function PlanSection({
           slug={slug}
           activityName={activityName}
           initial={initial ?? undefined}
+          customMetrics={customMetrics}
           onSaved={() => setEditing(false)}
         />
       </section>
