@@ -131,9 +131,6 @@ export default async function HealthOverviewPage() {
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-semibold">Your body</h2>
-          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-            Click any muscle, heart, or head
-          </span>
         </div>
         <BodyExplorer
           muscleStates={muscleStates}

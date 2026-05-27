@@ -2,10 +2,7 @@
 
 import { Suspense, useRef, useEffect } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import {
-  OrbitControls,
-  ContactShadows,
-} from "@react-three/drei";
+import { OrbitControls, ContactShadows } from "@react-three/drei";
 import * as THREE from "three";
 import type { MuscleGroup, MuscleState } from "@/lib/body/muscle-state";
 import { Humanoid, type BodySelection } from "./Humanoid";
@@ -19,7 +16,6 @@ type Props = {
   mode: Mode;
 };
 
-/** Camera targets per mode. Preview = small + left. Idle = centered. Focused = left so detail panel fits on right. */
 const TARGETS = {
   preview: {
     pos: new THREE.Vector3(1.1, 1.25, 4.8),
@@ -38,28 +34,44 @@ const TARGETS = {
 function CameraRig({ mode }: { mode: Mode }) {
   const { camera } = useThree();
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
-  const desired = useRef({ pos: TARGETS.preview.pos.clone(), look: TARGETS.preview.lookAt.clone() });
+  const desired = useRef({
+    pos: TARGETS.preview.pos.clone(),
+    look: TARGETS.preview.lookAt.clone(),
+  });
+  // Once the camera settles at the target, stop lerping so orbit controls take over freely.
+  const settled = useRef(false);
 
   useEffect(() => {
     const t = TARGETS[mode];
     desired.current.pos = t.pos.clone();
     desired.current.look = t.lookAt.clone();
+    settled.current = false;
   }, [mode]);
 
   useFrame((_, dt) => {
-    const k = 1 - Math.pow(0.0001, dt); // ~85% per second
-    camera.position.lerp(desired.current.pos, k);
-    if (controlsRef.current) {
-      const controls = controlsRef.current as unknown as {
-        target: THREE.Vector3;
-        update: () => void;
-        enabled: boolean;
-      };
-      controls.target.lerp(desired.current.look, k);
-      controls.enabled = mode === "focused";
+    const controls = controlsRef.current as unknown as {
+      target: THREE.Vector3;
+      update: () => void;
+      enabled: boolean;
+    } | null;
+
+    if (!settled.current) {
+      const k = 1 - Math.pow(0.0001, dt); // ~85% per second
+      camera.position.lerp(desired.current.pos, k);
+      if (controls) {
+        controls.target.lerp(desired.current.look, k);
+      } else {
+        camera.lookAt(desired.current.look);
+      }
+      if (camera.position.distanceTo(desired.current.pos) < 0.015) {
+        settled.current = true;
+      }
+    }
+
+    if (controls) {
+      // Allow free orbit in idle + focused; lock in preview.
+      controls.enabled = mode !== "preview";
       controls.update();
-    } else {
-      camera.lookAt(desired.current.look);
     }
   });
 
@@ -68,11 +80,11 @@ function CameraRig({ mode }: { mode: Mode }) {
       ref={controlsRef}
       target={TARGETS.preview.lookAt.toArray()}
       enablePan={false}
-      minDistance={1.3}
-      maxDistance={3.5}
-      minPolarAngle={Math.PI * 0.2}
-      maxPolarAngle={Math.PI * 0.82}
-      dampingFactor={0.08}
+      minDistance={1.0}
+      maxDistance={5.0}
+      minPolarAngle={Math.PI * 0.15}
+      maxPolarAngle={Math.PI * 0.88}
+      dampingFactor={0.06}
       enableDamping
     />
   );
@@ -91,20 +103,12 @@ function GridFloor() {
           toneMapped={false}
         />
       </mesh>
-      <gridHelper
-        args={[6, 24, "#1e4a66", "#0e2a3a"]}
-        position={[0, 0, 0]}
-      />
+      <gridHelper args={[6, 24, "#1e4a66", "#0e2a3a"]} position={[0, 0, 0]} />
     </group>
   );
 }
 
-export default function BodyScene({
-  muscleStates,
-  selection,
-  onSelect,
-  mode,
-}: Props) {
+export default function BodyScene({ muscleStates, selection, onSelect, mode }: Props) {
   return (
     <Canvas
       shadows
@@ -114,14 +118,10 @@ export default function BodyScene({
       style={{ width: "100%", height: "100%" }}
     >
       {mode !== "preview" ? <color attach="background" args={["#04080d"]} /> : null}
-      {mode !== "preview" ? <fog attach="fog" args={["#04080d", 5, 9]} /> : null}
+      {mode !== "preview" ? <fog attach="fog" args={["#04080d", 6, 11]} /> : null}
 
       <ambientLight intensity={0.25} />
-      <directionalLight
-        position={[2, 4, 3]}
-        intensity={0.45}
-        color="#6cc6ff"
-      />
+      <directionalLight position={[2, 4, 3]} intensity={0.45} color="#6cc6ff" />
       <pointLight position={[-1.5, 2.5, 1.5]} intensity={1.2} color="#5be3ff" />
       <pointLight position={[1.5, 2, -1.5]} intensity={0.6} color="#3a7dff" />
 
