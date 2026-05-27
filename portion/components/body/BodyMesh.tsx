@@ -38,7 +38,7 @@ const SKIN_VERT = /* glsl */ `
   }
 `;
 
-// Much dimmer than before — rim-only, almost invisible head-on.
+// Barely-there: thin rim only, no scan band, very low alpha.
 const SKIN_FRAG = /* glsl */ `
   precision highp float;
   uniform float uTime;
@@ -48,10 +48,9 @@ const SKIN_FRAG = /* glsl */ `
   varying vec3 vWorldPos;
   void main() {
     float NdotV = clamp(dot(normalize(vViewNormal), normalize(vViewDir)), 0.0, 1.0);
-    float fresnel = pow(1.0 - NdotV, 2.4);
-    float band = smoothstep(0.04, 0.0, abs(fract(uTime * 0.18) * 2.2 - vWorldPos.y));
-    vec3 col = uColor * (0.04 + fresnel * 0.55 + band * 0.18);
-    float alpha = clamp(fresnel * 0.35 + 0.03 + band * 0.12, 0.0, 0.55);
+    float fresnel = pow(1.0 - NdotV, 3.0);
+    vec3 col = uColor * (0.02 + fresnel * 0.22);
+    float alpha = clamp(fresnel * 0.18 + 0.015, 0.0, 0.3);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -139,11 +138,11 @@ export function BodyMesh({
       color: new THREE.Color(color),
       wireframe: true,
       transparent: true,
-      opacity: 0.32, // way dimmer than before
+      opacity: 0.45, // normal blending keeps lines crisp without bloom halo
       depthWrite: false,
       toneMapped: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
+      blending: THREE.NormalBlending,
+      side: THREE.FrontSide,
     });
 
     const out = new THREE.Group();
