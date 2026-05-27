@@ -30,7 +30,7 @@ export default async function CheckInPage() {
       where: { profileId_date: { profileId: user.id, date: today } },
     }),
     prisma.activityType.findMany({
-      where: { profileId: user.id },
+      where: { profileId: user.id, kind: { in: ["STRENGTH", "CARDIO", "SPORT"] } },
       orderBy: { createdAt: "asc" },
       select: { id: true, name: true, slug: true, icon: true, kind: true },
     }),
@@ -80,7 +80,7 @@ export default async function CheckInPage() {
         tasks={todayTasks}
         meals={meals}
         metric={metric}
-        activityTypes={activityTypes}
+        activityTypes={activityTypes as any}
       />
     </div>
   );

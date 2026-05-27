@@ -109,81 +109,105 @@ export function BodyMesh({
 
   // Clone the scene so we can mutate materials without affecting the cached source.
   // SkeletonUtils handles cloning SkinnedMesh correctly (preserving bone references).
-  const scene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf]);
+  const scene = useMemo(() => {
+    try {
+      return SkeletonUtils.clone(gltf.scene);
+    } catch (e) {
+      console.error("Failed to clone GLB scene:", e);
+      return null;
+    }
+  }, [gltf]);
 
   // Build a duplicate scene with wireframe materials, layered on top.
-  const wireScene = useMemo(() => SkeletonUtils.clone(gltf.scene), [gltf]);
+  const wireScene = useMemo(() => {
+    try {
+      return SkeletonUtils.clone(gltf.scene);
+    } catch (e) {
+      console.error("Failed to clone wireframe scene:", e);
+      return null;
+    }
+  }, [gltf]);
 
   // Compute the bounding box of the original scene so we can scale + center.
   const { scale, offset } = useMemo(() => {
-    const box = new THREE.Box3();
-    gltf.scene.updateMatrixWorld(true);
-    box.setFromObject(gltf.scene);
-    const size = new THREE.Vector3();
-    const center = new THREE.Vector3();
-    box.getSize(size);
-    box.getCenter(center);
-    const height = size.y || 1;
-    const s = targetHeight / height;
-    const offsetY = floorY - box.min.y * s;
-    const offsetX = -center.x * s;
-    const offsetZ = -center.z * s;
-    return {
-      scale: s,
-      offset: new THREE.Vector3(offsetX, offsetY, offsetZ),
-    };
+    try {
+      const box = new THREE.Box3();
+      gltf.scene.updateMatrixWorld(true);
+      box.setFromObject(gltf.scene);
+      const size = new THREE.Vector3();
+      const center = new THREE.Vector3();
+      box.getSize(size);
+      box.getCenter(center);
+      const height = size.y || 1;
+      const s = targetHeight / height;
+      const offsetY = floorY - box.min.y * s;
+      const offsetX = -center.x * s;
+      const offsetZ = -center.z * s;
+      console.log("Body mesh scaling:", { height, scale: s, size: size.toArray() });
+      return {
+        scale: s,
+        offset: new THREE.Vector3(offsetX, offsetY, offsetZ),
+      };
+    } catch (e) {
+      console.error("Failed to compute bounding box:", e);
+      return { scale: 1, offset: new THREE.Vector3(0, 0, 0) };
+    }
   }, [gltf, targetHeight, floorY]);
 
   // Swap materials on every mesh — skin pass for the main scene, wireframe pass for the overlay.
   useEffect(() => {
-    const skinUniforms = skinUniformsRef.current;
-    const wireUniforms = wireUniformsRef.current;
+    if (!scene || !wireScene) return;
+    try {
+      const skinUniforms = skinUniformsRef.current;
+      const wireUniforms = wireUniformsRef.current;
 
-    scene.traverse((obj) => {
-      const mesh = obj as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const oldMat = mesh.material;
-      const skinMat = new THREE.ShaderMaterial({
-        vertexShader: SKIN_VERT,
-        fragmentShader: SKIN_FRAG,
-        uniforms: skinUniforms,
-        transparent: true,
-        depthWrite: false,
-        toneMapped: false,
-        blending: THREE.NormalBlending,
-        side: THREE.FrontSide,
+      let meshCount = 0;
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        meshCount++;
+        const oldMat = mesh.material;
+        const skinMat = new THREE.ShaderMaterial({
+          vertexShader: SKIN_VERT,
+          fragmentShader: SKIN_FRAG,
+          uniforms: skinUniforms,
+          transparent: true,
+          depthWrite: false,
+          toneMapped: false,
+          blending: THREE.NormalBlending,
+          side: THREE.FrontSide,
+        });
+        mesh.material = skinMat;
+        mesh.renderOrder = 1;
+        if (Array.isArray(oldMat)) oldMat.forEach((m) => m.dispose());
+        else if (oldMat) oldMat.dispose();
       });
-      // Preserve skinning attribute for SkinnedMesh — three.js auto-injects skinning code
-      // into ShaderMaterial when the mesh is a SkinnedMesh? No — we need to opt in by
-      // toggling material.skinning. Three.js r150+ removed that flag; instead it relies
-      // on the geometry having skin attributes. Our shader does not include skinning,
-      // so the bind-pose geometry shows as T-pose (which is what we want).
-      mesh.material = skinMat;
-      mesh.renderOrder = 1;
-      if (Array.isArray(oldMat)) oldMat.forEach((m) => m.dispose());
-      else if (oldMat) oldMat.dispose();
-    });
+      console.log("Skin materials applied to", meshCount, "meshes");
 
-    wireScene.traverse((obj) => {
-      const mesh = obj as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      const oldMat = mesh.material;
-      const wireMat = new THREE.ShaderMaterial({
-        vertexShader: WIRE_VERT,
-        fragmentShader: WIRE_FRAG,
-        uniforms: wireUniforms,
-        transparent: true,
-        depthWrite: false,
-        toneMapped: false,
-        blending: THREE.AdditiveBlending,
-        wireframe: true,
-        side: THREE.FrontSide,
+      wireScene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const oldMat = mesh.material;
+        const wireMat = new THREE.ShaderMaterial({
+          vertexShader: WIRE_VERT,
+          fragmentShader: WIRE_FRAG,
+          uniforms: wireUniforms,
+          transparent: true,
+          depthWrite: false,
+          toneMapped: false,
+          blending: THREE.AdditiveBlending,
+          wireframe: true,
+          side: THREE.FrontSide,
+        });
+        mesh.material = wireMat;
+        mesh.renderOrder = 2;
+        if (Array.isArray(oldMat)) oldMat.forEach((m) => m.dispose());
+        else if (oldMat) oldMat.dispose();
       });
-      mesh.material = wireMat;
-      mesh.renderOrder = 2;
-      if (Array.isArray(oldMat)) oldMat.forEach((m) => m.dispose());
-      else if (oldMat) oldMat.dispose();
-    });
+      console.log("Wireframe materials applied");
+    } catch (e) {
+      console.error("Failed to apply materials:", e);
+    }
   }, [scene, wireScene]);
 
   useEffect(() => {
@@ -194,6 +218,11 @@ export function BodyMesh({
   useFrame((state) => {
     skinUniformsRef.current.uTime.value = state.clock.getElapsedTime();
   });
+
+  if (!scene || !wireScene) {
+    console.warn("Body mesh scenes not loaded yet");
+    return null;
+  }
 
   return (
     <group position={offset} scale={scale}>

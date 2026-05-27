@@ -9,7 +9,7 @@ export default async function HealthLayout({ children }: { children: React.React
   if (!user) redirect("/auth/login");
 
   const activityTypes = await prisma.activityType.findMany({
-    where: { profileId: user.id, pillar: "HEALTH" },
+    where: { profileId: user.id, pillar: "HEALTH", kind: { in: ["STRENGTH", "CARDIO", "SPORT"] } },
     orderBy: { createdAt: "asc" },
     select: { id: true, name: true, slug: true, icon: true, color: true, kind: true },
   });
@@ -19,7 +19,7 @@ export default async function HealthLayout({ children }: { children: React.React
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Health</h1>
         <p className="text-sm text-muted-foreground">Training, nutrition, and body metrics.</p>
-        <HealthSubNav activityTypes={activityTypes} />
+        <HealthSubNav activityTypes={activityTypes as any} />
       </div>
       {children}
     </div>

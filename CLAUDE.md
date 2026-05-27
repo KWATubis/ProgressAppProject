@@ -42,6 +42,14 @@ The app lives at: `C:\Users\jkond\Desktop\ProgressAppProject\portion\`
 The first user's goals come from the Second Brain Obsidian vault at:
 `C:\Users\jkond\Desktop\Second Brain\Second Brain\`
 
+## Target Audience
+
+Portion is built for **young men aged 16–24 trying to "make it"** — chasing fitness, money/business, content/personal brand, and skill acquisition in parallel. They're ambitious, internet-native, and follow creators like Tate, Hamza, Goggins, Sulek. They use language like "lock in," "make it," "GMI/NGMI," "grind," and "aura."
+
+Their core pain is **overwhelm**: too many goals, scattered tools (Notion + Apple Notes + paper + four separate trackers), no single place to see whether the work they're doing today is actually pulling them toward the life they want. Portion exists to **organize their thoughts and workload into one dashboard** so they can stop spinning wheels and start compounding. The first user (Jędrek) is inside this ICP himself — he's the seed customer.
+
+Full VOC research, competitor matrix, and idea backlog live in the plan vault: `C:\Users\jkond\Desktop\Claude's Progress App\research\`.
+
 ## Git Workflow
 
 After every change to the codebase:
