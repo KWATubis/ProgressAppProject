@@ -25,8 +25,13 @@ type Props = {
 };
 
 export function BodyExplorer({ muscleStates, wellnessTrend }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const [selection, setSelection] = useState<BodySelection>(null);
-  const mode = selection ? "focused" : "idle";
+  const mode: "preview" | "idle" | "focused" = !expanded
+    ? "preview"
+    : selection
+      ? "focused"
+      : "idle";
 
   const trainedCount = useMemo(
     () =>
@@ -36,10 +41,22 @@ export function BodyExplorer({ muscleStates, wellnessTrend }: Props) {
     [muscleStates],
   );
 
+  const handleSelect = (s: BodySelection) => {
+    if (!expanded) {
+      setExpanded(true);
+      return;
+    }
+    setSelection(s);
+  };
+
   return (
     <div className="relative h-[640px] w-full overflow-hidden rounded-2xl">
-      {/* Atmospheric backdrop */}
-      <div className="pointer-events-none absolute inset-0 -z-10">
+      {/* Atmospheric backdrop — only once expanded */}
+      <div
+        className={`pointer-events-none absolute inset-0 -z-10 transition-opacity duration-700 ${
+          mode === "preview" ? "opacity-0" : "opacity-100"
+        }`}
+      >
         <div
           className="absolute inset-0"
           style={{
@@ -66,56 +83,58 @@ export function BodyExplorer({ muscleStates, wellnessTrend }: Props) {
         />
       </div>
 
-      {/* HUD: top-left status */}
-      <div className="pointer-events-none absolute left-5 top-5 z-10 space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
-          <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-300/80">
-            Body scan · live
-          </span>
-        </div>
-        <div className="space-y-0.5 text-[10px] uppercase tracking-wider text-cyan-200/40">
-          <div>
-            Trained today / yest{" "}
-            <span className="text-cyan-300/90 tabular-nums">{trainedCount}</span>
-          </div>
-          <div>
-            Groups tracked{" "}
-            <span className="text-cyan-300/90 tabular-nums">
-              {Object.keys(muscleStates).length}
+      {/* HUD: top-left status — hidden in preview */}
+      {mode !== "preview" ? (
+        <div className="pointer-events-none absolute left-5 top-5 z-10 space-y-2 animate-in fade-in duration-500">
+          <div className="flex items-center gap-2">
+            <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+            <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-300/80">
+              Body scan · live
             </span>
           </div>
+          <div className="space-y-0.5 text-[10px] uppercase tracking-wider text-cyan-200/40">
+            <div>
+              Trained today / yest{" "}
+              <span className="text-cyan-300/90 tabular-nums">{trainedCount}</span>
+            </div>
+            <div>
+              Groups tracked{" "}
+              <span className="text-cyan-300/90 tabular-nums">
+                {Object.keys(muscleStates).length}
+              </span>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {/* HUD: legend bottom-left */}
-      <div className="pointer-events-none absolute bottom-5 left-5 z-10">
-        <div className="space-y-1 text-[10px] uppercase tracking-wider">
-          <LegendRow color="#ef4444" label="Just trained" />
-          <LegendRow color="#f97316" label="Sore" />
-          <LegendRow color="#eab308" label="Recovering" />
-          <LegendRow color="#10b981" label="Rested" />
+      {/* HUD: legend bottom-left — hidden in preview */}
+      {mode !== "preview" ? (
+        <div className="pointer-events-none absolute bottom-5 left-5 z-10 animate-in fade-in duration-500">
+          <div className="space-y-1 text-[10px] uppercase tracking-wider">
+            <LegendRow color="#ef4444" label="Just trained" />
+            <LegendRow color="#f97316" label="Sore" />
+            <LegendRow color="#eab308" label="Recovering" />
+            <LegendRow color="#10b981" label="Rested" />
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {/* Hint — idle only */}
-      {mode === "idle" ? (
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-1/2 flex-col items-center justify-center px-10 text-right md:items-end">
+      {/* Preview hint — pre-click only. Body sits on the left, label on the right. */}
+      {mode === "preview" ? (
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-1/2 flex-col items-end justify-center px-10 text-right">
           <div className="max-w-xs">
             <div className="text-[10px] uppercase tracking-[0.4em] text-cyan-300/60">
               Your body
             </div>
-            <h3 className="mt-3 text-3xl font-light leading-tight text-cyan-50">
-              Click a muscle, heart or head to drill in.
+            <h3 className="mt-3 text-2xl font-light leading-tight text-cyan-50/90">
+              An overview of your body.
             </h3>
-            <p className="mt-4 text-xs leading-relaxed text-cyan-200/40">
-              Holographic mirror of your last 30 days of training. Muscles glow
-              by recovery state — fresh red, working orange, recovering yellow,
-              ready green.
+            <p className="mt-3 text-[11px] uppercase tracking-[0.3em] text-cyan-200/40">
+              Click to see
             </p>
             <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/[0.05] px-3 py-1.5 text-[10px] uppercase tracking-widest text-cyan-200/80">
               <span className="block h-1 w-1 animate-ping rounded-full bg-cyan-300" />
-              Awaiting input
+              Tap to expand
             </div>
           </div>
         </div>
@@ -126,10 +145,20 @@ export function BodyExplorer({ muscleStates, wellnessTrend }: Props) {
         <BodyScene
           muscleStates={muscleStates}
           selection={selection}
-          onSelect={setSelection}
+          onSelect={handleSelect}
           mode={mode}
         />
       </div>
+
+      {/* Click-to-expand overlay — preview only. Sits above the canvas so any click expands. */}
+      {mode === "preview" ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-label="Expand body overview"
+          className="absolute inset-0 z-20 cursor-pointer bg-transparent"
+        />
+      ) : null}
 
       {/* Detail panel slides in from right when focused */}
       <div

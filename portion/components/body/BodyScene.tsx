@@ -10,29 +10,35 @@ import * as THREE from "three";
 import type { MuscleGroup, MuscleState } from "@/lib/body/muscle-state";
 import { Humanoid, type BodySelection } from "./Humanoid";
 
+type Mode = "preview" | "idle" | "focused";
+
 type Props = {
   muscleStates: Record<MuscleGroup, MuscleState>;
   selection: BodySelection;
   onSelect: (s: BodySelection) => void;
-  mode: "idle" | "focused";
+  mode: Mode;
 };
 
-/** Camera targets per mode. Idle pushes the body to the left of the canvas. */
+/** Camera targets per mode. Preview = small + left. Idle = centered. Focused = left so detail panel fits on right. */
 const TARGETS = {
+  preview: {
+    pos: new THREE.Vector3(1.1, 1.25, 4.8),
+    lookAt: new THREE.Vector3(0.75, 1.05, 0),
+  },
   idle: {
-    pos: new THREE.Vector3(0.95, 1.25, 3.1),
-    lookAt: new THREE.Vector3(0.5, 1.05, 0),
+    pos: new THREE.Vector3(0, 1.3, 2.5),
+    lookAt: new THREE.Vector3(0, 1.05, 0),
   },
   focused: {
-    pos: new THREE.Vector3(0, 1.2, 2.0),
-    lookAt: new THREE.Vector3(0, 1.05, 0),
+    pos: new THREE.Vector3(0.95, 1.2, 2.0),
+    lookAt: new THREE.Vector3(0.5, 1.05, 0),
   },
 } as const;
 
-function CameraRig({ mode }: { mode: "idle" | "focused" }) {
+function CameraRig({ mode }: { mode: Mode }) {
   const { camera } = useThree();
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
-  const desired = useRef({ pos: TARGETS.idle.pos.clone(), look: TARGETS.idle.lookAt.clone() });
+  const desired = useRef({ pos: TARGETS.preview.pos.clone(), look: TARGETS.preview.lookAt.clone() });
 
   useEffect(() => {
     const t = TARGETS[mode];
@@ -60,7 +66,7 @@ function CameraRig({ mode }: { mode: "idle" | "focused" }) {
   return (
     <OrbitControls
       ref={controlsRef}
-      target={TARGETS.idle.lookAt.toArray()}
+      target={TARGETS.preview.lookAt.toArray()}
       enablePan={false}
       minDistance={1.3}
       maxDistance={3.5}
@@ -103,12 +109,12 @@ export default function BodyScene({
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: TARGETS.idle.pos.toArray(), fov: 32 }}
+      camera={{ position: TARGETS.preview.pos.toArray(), fov: 32 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       style={{ width: "100%", height: "100%" }}
     >
-      <color attach="background" args={["#04080d"]} />
-      <fog attach="fog" args={["#04080d", 5, 9]} />
+      {mode !== "preview" ? <color attach="background" args={["#04080d"]} /> : null}
+      {mode !== "preview" ? <fog attach="fog" args={["#04080d", 5, 9]} /> : null}
 
       <ambientLight intensity={0.25} />
       <directionalLight
@@ -123,18 +129,20 @@ export default function BodyScene({
         <Humanoid
           muscleStates={muscleStates}
           selection={selection}
-          onSelect={onSelect}
-          autoRotate={mode === "idle"}
+          onSelect={mode === "preview" ? () => {} : onSelect}
+          autoRotate={mode !== "focused"}
         />
-        <GridFloor />
-        <ContactShadows
-          position={[0, 0.005, 0]}
-          opacity={0.4}
-          scale={2.2}
-          blur={2.8}
-          far={1.8}
-          color="#0d2a40"
-        />
+        {mode !== "preview" ? <GridFloor /> : null}
+        {mode !== "preview" ? (
+          <ContactShadows
+            position={[0, 0.005, 0]}
+            opacity={0.4}
+            scale={2.2}
+            blur={2.8}
+            far={1.8}
+            color="#0d2a40"
+          />
+        ) : null}
       </Suspense>
 
       <CameraRig mode={mode} />
