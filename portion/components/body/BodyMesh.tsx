@@ -106,10 +106,15 @@ export function BodyMesh({
   });
 
   const gltf = useGLTF("/models/body.glb");
+  console.log("useGLTF result:", gltf?.scene ? "loaded" : "not loaded");
 
   // Clone the scene so we can mutate materials without affecting the cached source.
   // SkeletonUtils handles cloning SkinnedMesh correctly (preserving bone references).
   const scene = useMemo(() => {
+    if (!gltf?.scene) {
+      console.warn("GLB scene not available");
+      return null;
+    }
     try {
       return SkeletonUtils.clone(gltf.scene);
     } catch (e) {
@@ -224,6 +229,7 @@ export function BodyMesh({
     return null;
   }
 
+  console.log("Rendering body mesh with offset:", offset, "scale:", scale);
   return (
     <group position={offset} scale={scale}>
       <primitive object={scene} />
