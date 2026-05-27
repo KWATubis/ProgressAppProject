@@ -52,7 +52,7 @@ export default async function HealthOverviewPage() {
   const muscleStates = MUSCLE_GROUPS.reduce(
     (acc, g) => {
       const found = muscleStateList.find((s) => s.group === g);
-      acc[g] = found ?? { group: g, daysSince: null, lastTrainedISO: null, lastSets: [] };
+      acc[g] = found ?? { group: g, daysSince: null, hoursSince: null, lastTrainedISO: null, lastSets: [] };
       return acc;
     },
     {} as Record<MuscleGroup, MuscleState>,

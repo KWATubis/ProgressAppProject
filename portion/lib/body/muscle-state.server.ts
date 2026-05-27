@@ -7,8 +7,13 @@ function daysBetween(from: Date, to: Date): number {
   return Math.max(0, Math.round((to.getTime() - from.getTime()) / 86_400_000));
 }
 
+function hoursBetween(from: Date, to: Date): number {
+  return Math.max(0, (to.getTime() - from.getTime()) / 3_600_000);
+}
+
 export async function getMuscleStates(profileId: string): Promise<MuscleState[]> {
   const today = toUtcMidnight();
+  const now = new Date();
   const lookback = new Date(today.getTime() - 30 * 86_400_000);
 
   const sessions = await prisma.workoutSession.findMany({
@@ -52,6 +57,7 @@ export async function getMuscleStates(profileId: string): Promise<MuscleState[]>
       return {
         group,
         daysSince: null,
+        hoursSince: null,
         lastTrainedISO: null,
         lastSets: [],
       };
@@ -59,6 +65,7 @@ export async function getMuscleStates(profileId: string): Promise<MuscleState[]>
     return {
       group,
       daysSince: daysBetween(entry.date, today),
+      hoursSince: hoursBetween(entry.date, now),
       lastTrainedISO: entry.date.toISOString().slice(0, 10),
       lastSets: entry.sets,
     };
