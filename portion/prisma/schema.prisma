@@ -56,6 +56,19 @@ enum ExerciseMetric {
   TIME
 }
 
+enum MetricAgg {
+  LATEST
+  MAX
+  SUM
+  COUNT
+  AVG
+}
+
+enum MetricDir {
+  HIGHER_BETTER
+  LOWER_BETTER
+}
+
 model Profile {
   id                String             @id
   email             String             @unique
@@ -74,6 +87,7 @@ model Profile {
   businessMetrics   BusinessMetric[]
   activityTypes     ActivityType[]
   wellnessDays      WellnessDay[]
+  customMetrics     CustomMetric[]
   onboardingSession OnboardingSession?
 }
 
@@ -93,6 +107,8 @@ model Goal {
   profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
   activityTypeId String?
   activityType   ActivityType? @relation(fields: [activityTypeId], references: [id], onDelete: SetNull)
+  customMetricId String?
+  customMetric   CustomMetric? @relation("GoalCustomMetric", fields: [customMetricId], references: [id], onDelete: SetNull)
   pillar         Pillar
   title          String
   description    String?
@@ -108,6 +124,7 @@ model Goal {
   tasks          Task[]
 
   @@index([profileId, activityTypeId])
+  @@index([customMetricId])
 }
 
 model Task {
@@ -182,6 +199,7 @@ model ActivityType {
   incomeEntries   IncomeEntry[]
   socialMetrics   SocialMetric[]
   businessMetrics BusinessMetric[]
+  customMetrics   CustomMetric[]
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -402,4 +420,36 @@ model BusinessMetric {
 
   @@unique([activityTypeId, date])
   @@index([profileId, activityTypeId])
+}
+
+model CustomMetric {
+  id             String        @id @default(cuid())
+  profileId      String
+  profile        Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  activityTypeId String
+  activityType   ActivityType  @relation(fields: [activityTypeId], references: [id], onDelete: Cascade)
+  title          String
+  unit           String
+  aggregation    MetricAgg     @default(LATEST)
+  direction      MetricDir     @default(HIGHER_BETTER)
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  entries        MetricEntry[]
+  goals          Goal[]        @relation("GoalCustomMetric")
+
+  @@index([profileId])
+  @@index([activityTypeId])
+}
+
+model MetricEntry {
+  id             String       @id @default(cuid())
+  customMetricId String
+  customMetric   CustomMetric @relation(fields: [customMetricId], references: [id], onDelete: Cascade)
+  date           DateTime
+  value          Float
+  notes          String?
+  createdAt      DateTime     @default(now())
+
+  @@index([customMetricId, date])
 }

@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
-import { GoalsManager, type GoalView } from "@/components/goals/GoalsManager";
+import {
+  GoalsManager,
+  type GoalView,
+  type CustomMetricOption,
+} from "@/components/goals/GoalsManager";
 import { withDerivedCurrent } from "@/lib/goalMetrics.server";
 
 export default async function GoalsPage() {
@@ -29,6 +33,23 @@ export default async function GoalsPage() {
     targetDate: g.targetDate ? g.targetDate.toISOString().slice(0, 10) : null,
     isActive: g.isActive,
     metricKey: g.metricKey,
+    customMetricId: g.customMetricId,
+  }));
+
+  const customMetrics: CustomMetricOption[] = (
+    await prisma.customMetric.findMany({
+      where: { profileId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: { activityType: { select: { name: true, pillar: true } } },
+    })
+  ).map((m) => ({
+    id: m.id,
+    title: m.title,
+    unit: m.unit,
+    aggregation: m.aggregation,
+    direction: m.direction,
+    activityName: m.activityType.name,
+    pillar: m.activityType.pillar,
   }));
 
   return (
@@ -40,7 +61,7 @@ export default async function GoalsPage() {
         </p>
       </div>
 
-      <GoalsManager initialGoals={views} />
+      <GoalsManager initialGoals={views} customMetrics={customMetrics} />
     </div>
   );
 }

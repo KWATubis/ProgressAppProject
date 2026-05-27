@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Dumbbell, Pencil, Plus, Trash2, TrendingUp, X } from "lucide-react";
+import { Dumbbell, Pencil, Plus, Trash2, TrendingUp, X, Zap } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { upsertGoal, deleteGoal } from "@/app/(app)/goals/actions";
 import { GOAL_METRICS, findMetric } from "@/lib/goalMetrics";
+import { LogMetricEntryDialog } from "@/components/metrics/LogMetricEntryDialog";
 
 export type Pillar = "HEALTH" | "MONEY";
 
@@ -34,6 +35,17 @@ export type GoalView = {
   targetDate: string | null;
   isActive: boolean;
   metricKey: string | null;
+  customMetricId: string | null;
+};
+
+export type CustomMetricOption = {
+  id: string;
+  title: string;
+  unit: string;
+  aggregation: "LATEST" | "MAX" | "SUM" | "COUNT" | "AVG";
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
+  activityName: string;
+  pillar: Pillar;
 };
 
 type EditorState =
@@ -55,7 +67,13 @@ function formatNum(n: number): string {
   return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(1);
 }
 
-export function GoalsManager({ initialGoals }: { initialGoals: GoalView[] }) {
+export function GoalsManager({
+  initialGoals,
+  customMetrics,
+}: {
+  initialGoals: GoalView[];
+  customMetrics: CustomMetricOption[];
+}) {
   const [editor, setEditor] = useState<EditorState>(null);
 
   const healthGoals = initialGoals.filter((g) => g.pillar === "HEALTH");
@@ -72,12 +90,14 @@ export function GoalsManager({ initialGoals }: { initialGoals: GoalView[] }) {
       <PillarSection
         pillar="HEALTH"
         goals={healthGoals}
+        customMetrics={customMetrics}
         onAdd={() => setEditor({ mode: "create", pillar: "HEALTH" })}
         onEdit={(g) => setEditor({ mode: "edit", goal: g })}
       />
       <PillarSection
         pillar="MONEY"
         goals={moneyGoals}
+        customMetrics={customMetrics}
         onAdd={() => setEditor({ mode: "create", pillar: "MONEY" })}
         onEdit={(g) => setEditor({ mode: "edit", goal: g })}
       />
@@ -88,6 +108,7 @@ export function GoalsManager({ initialGoals }: { initialGoals: GoalView[] }) {
             <GoalEditorForm
               key={editorKey}
               state={editor}
+              customMetrics={customMetrics}
               onClose={() => setEditor(null)}
             />
           )}
@@ -100,11 +121,13 @@ export function GoalsManager({ initialGoals }: { initialGoals: GoalView[] }) {
 function PillarSection({
   pillar,
   goals,
+  customMetrics,
   onAdd,
   onEdit,
 }: {
   pillar: Pillar;
   goals: GoalView[];
+  customMetrics: CustomMetricOption[];
   onAdd: () => void;
   onEdit: (g: GoalView) => void;
 }) {
@@ -131,7 +154,12 @@ function PillarSection({
       ) : (
         <div className="space-y-2">
           {goals.map((g) => (
-            <GoalRow key={g.id} goal={g} onEdit={() => onEdit(g)} />
+            <GoalRow
+              key={g.id}
+              goal={g}
+              customMetrics={customMetrics}
+              onEdit={() => onEdit(g)}
+            />
           ))}
         </div>
       )}
@@ -139,10 +167,22 @@ function PillarSection({
   );
 }
 
-function GoalRow({ goal, onEdit }: { goal: GoalView; onEdit: () => void }) {
+function GoalRow({
+  goal,
+  customMetrics,
+  onEdit,
+}: {
+  goal: GoalView;
+  customMetrics: CustomMetricOption[];
+  onEdit: () => void;
+}) {
   const router = useRouter();
   const [deleting, startDelete] = useTransition();
+  const [logOpen, setLogOpen] = useState(false);
   const pct = progressPct(goal);
+  const linkedCustomMetric = goal.customMetricId
+    ? customMetrics.find((m) => m.id === goal.customMetricId) ?? null
+    : null;
 
   function handleDelete() {
     if (!confirm(`Delete goal "${goal.title}"? This cannot be undone.`)) return;
@@ -178,7 +218,12 @@ function GoalRow({ goal, onEdit }: { goal: GoalView; onEdit: () => void }) {
           {goal.description && (
             <p className="text-xs text-muted-foreground">{goal.description}</p>
           )}
-          {goal.metricKey && (
+          {linkedCustomMetric && (
+            <p className="text-[10px] text-emerald-400/80">
+              Auto-tracked · {linkedCustomMetric.title} ({linkedCustomMetric.aggregation.toLowerCase()})
+            </p>
+          )}
+          {!linkedCustomMetric && goal.metricKey && (
             <p className="text-[10px] text-emerald-400/80">
               Auto-tracked · {findMetric(goal.metricKey)?.label ?? goal.metricKey}
             </p>
@@ -208,6 +253,19 @@ function GoalRow({ goal, onEdit }: { goal: GoalView; onEdit: () => void }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
+          {linkedCustomMetric && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 px-2 text-[11px]"
+              onClick={() => setLogOpen(true)}
+              aria-label="Log entry"
+            >
+              <Zap className="h-3 w-3" />
+              Log
+            </Button>
+          )}
           <Button
             type="button"
             size="icon-sm"
@@ -230,15 +288,24 @@ function GoalRow({ goal, onEdit }: { goal: GoalView; onEdit: () => void }) {
           </Button>
         </div>
       </div>
+      {linkedCustomMetric && (
+        <LogMetricEntryDialog
+          metric={linkedCustomMetric}
+          open={logOpen}
+          onOpenChange={setLogOpen}
+        />
+      )}
     </div>
   );
 }
 
 function GoalEditorForm({
   state,
+  customMetrics,
   onClose,
 }: {
   state: NonNullable<EditorState>;
+  customMetrics: CustomMetricOption[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -248,10 +315,17 @@ function GoalEditorForm({
   const initial = isEdit ? state.goal : null;
   const initialPillar = state.mode === "create" ? state.pillar : state.goal.pillar;
 
+  // "" = manual, "builtin:<key>" = built-in metric, "custom:<id>" = custom metric
+  const initialSelection = initial?.customMetricId
+    ? `custom:${initial.customMetricId}`
+    : initial?.metricKey
+      ? `builtin:${initial.metricKey}`
+      : "";
+
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [pillar, setPillar] = useState<Pillar>(initialPillar);
-  const [metricKey, setMetricKey] = useState<string>(initial?.metricKey ?? "");
+  const [selection, setSelection] = useState<string>(initialSelection);
   const [currentValue, setCurrentValue] = useState(
     initial?.currentValue != null ? String(initial.currentValue) : "",
   );
@@ -262,19 +336,37 @@ function GoalEditorForm({
   const [targetDate, setTargetDate] = useState(initial?.targetDate ?? "");
   const [isActive, setIsActive] = useState(initial?.isActive ?? true);
 
-  const metric = findMetric(metricKey);
-  const pillarMetrics = GOAL_METRICS.filter((m) => m.pillar === pillar);
+  const selectedBuiltinKey = selection.startsWith("builtin:")
+    ? selection.slice(8)
+    : null;
+  const selectedCustomId = selection.startsWith("custom:")
+    ? selection.slice(7)
+    : null;
+  const builtinMetric = findMetric(selectedBuiltinKey ?? undefined);
+  const customMetric = selectedCustomId
+    ? customMetrics.find((m) => m.id === selectedCustomId) ?? null
+    : null;
+  const hasMetric = !!builtinMetric || !!customMetric;
+
+  const pillarBuiltins = GOAL_METRICS.filter((m) => m.pillar === pillar);
+  const pillarCustoms = customMetrics.filter((m) => m.pillar === pillar);
 
   // If user switches pillar, clear an incompatible metric pick.
   function changePillar(p: Pillar) {
     setPillar(p);
-    if (metric && metric.pillar !== p) setMetricKey("");
+    if (builtinMetric && builtinMetric.pillar !== p) setSelection("");
+    if (customMetric && customMetric.pillar !== p) setSelection("");
   }
 
-  function changeMetric(key: string) {
-    setMetricKey(key);
-    const m = findMetric(key);
-    if (m) setUnit(m.unit);
+  function changeSelection(v: string) {
+    setSelection(v);
+    if (v.startsWith("builtin:")) {
+      const m = findMetric(v.slice(8));
+      if (m) setUnit(m.unit);
+    } else if (v.startsWith("custom:")) {
+      const m = customMetrics.find((x) => x.id === v.slice(7));
+      if (m) setUnit(m.unit);
+    }
   }
 
   function submit() {
@@ -295,12 +387,13 @@ function GoalEditorForm({
         pillar,
         title: title.trim(),
         description: description.trim() || null,
-        currentValue: parseNum(currentValue),
+        currentValue: hasMetric ? null : parseNum(currentValue),
         targetValue: parseNum(targetValue),
         unit: unit.trim() || null,
         targetDate: targetDate || null,
         isActive,
-        metricKey: metricKey || null,
+        metricKey: selectedBuiltinKey,
+        customMetricId: selectedCustomId,
       });
       if ("error" in res) {
         toast.error(res.error);
@@ -358,21 +451,36 @@ function GoalEditorForm({
             <Label htmlFor="goal-metric">Track</Label>
             <select
               id="goal-metric"
-              value={metricKey}
-              onChange={(e) => changeMetric(e.target.value)}
+              value={selection}
+              onChange={(e) => changeSelection(e.target.value)}
               className="flex h-9 w-full rounded-md border bg-background px-2 text-sm outline-none focus:border-foreground"
             >
-              <option value="">Custom — I&apos;ll update progress manually</option>
-              {pillarMetrics.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.label} ({m.unit})
-                </option>
-              ))}
+              <option value="">Manual — I&apos;ll update progress myself</option>
+              {pillarCustoms.length > 0 && (
+                <optgroup label="Your custom metrics">
+                  {pillarCustoms.map((m) => (
+                    <option key={m.id} value={`custom:${m.id}`}>
+                      {m.title} · {m.activityName} ({m.unit}, {m.aggregation.toLowerCase()})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {pillarBuiltins.length > 0 && (
+                <optgroup label="Built-in metrics">
+                  {pillarBuiltins.map((m) => (
+                    <option key={m.key} value={`builtin:${m.key}`}>
+                      {m.label} ({m.unit})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <p className="text-[11px] text-muted-foreground">
-              {metric
-                ? `Progress updates automatically from your ${metric.hint?.toLowerCase() ?? metric.label.toLowerCase()}.`
-                : "You'll type in the current value yourself."}
+              {customMetric
+                ? `Auto-updates from the ${customMetric.aggregation.toLowerCase()} of your "${customMetric.title}" entries.`
+                : builtinMetric
+                  ? `Progress updates automatically from your ${builtinMetric.hint?.toLowerCase() ?? builtinMetric.label.toLowerCase()}.`
+                  : "Custom metrics are created from an activity page. Here you can pick one you've already defined."}
             </p>
           </div>
 
@@ -396,8 +504,8 @@ function GoalEditorForm({
                 inputMode="decimal"
                 value={currentValue}
                 onChange={(e) => setCurrentValue(e.target.value)}
-                placeholder={metric ? "Auto" : "—"}
-                disabled={!!metric}
+                placeholder={hasMetric ? "Auto" : "—"}
+                disabled={hasMetric}
               />
             </div>
             <div className="space-y-1.5">
@@ -421,7 +529,7 @@ function GoalEditorForm({
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 placeholder="kg, followers, zł…"
-                disabled={!!metric}
+                disabled={hasMetric}
               />
             </div>
             <div className="space-y-1.5">

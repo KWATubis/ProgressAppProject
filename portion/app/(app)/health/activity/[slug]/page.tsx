@@ -70,9 +70,24 @@ export default async function ActivityPage({
         startValue: rawActivityGoal.startValue,
         unit: rawActivityGoal.unit,
         metricKey: rawActivityGoal.metricKey,
+        customMetricId: rawActivityGoal.customMetricId,
         targetDate: rawActivityGoal.targetDate ? formatISODate(rawActivityGoal.targetDate) : null,
       }
     : null;
+
+  const customMetrics = (
+    await prisma.customMetric.findMany({
+      where: { profileId: user.id, activityTypeId: activity.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, title: true, unit: true, aggregation: true, direction: true },
+    })
+  ).map((m) => ({
+    id: m.id,
+    title: m.title,
+    unit: m.unit,
+    aggregation: m.aggregation,
+    direction: m.direction,
+  }));
 
   const goalCard = (
     <ActivityGoalCard
@@ -82,6 +97,7 @@ export default async function ActivityPage({
       pillar="HEALTH"
       kind={activity.kind as ActivityKind}
       color={activity.color}
+      customMetrics={customMetrics}
     />
   );
 

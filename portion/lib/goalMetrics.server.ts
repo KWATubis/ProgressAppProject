@@ -6,6 +6,59 @@ function startOfMonthUTC(d: Date): Date {
 }
 
 /**
+ * Aggregate `MetricEntry` rows for a custom metric according to its
+ * declared aggregation mode. Returns null when the metric has no entries
+ * yet (so the goal card can show an em-dash instead of a stale zero).
+ */
+export async function computeCustomMetricValue(
+  customMetricId: string,
+): Promise<number | null> {
+  const metric = await prisma.customMetric.findUnique({
+    where: { id: customMetricId },
+    select: { aggregation: true },
+  });
+  if (!metric) return null;
+
+  switch (metric.aggregation) {
+    case "LATEST": {
+      const latest = await prisma.metricEntry.findFirst({
+        where: { customMetricId },
+        orderBy: { date: "desc" },
+        select: { value: true },
+      });
+      return latest?.value ?? null;
+    }
+    case "MAX": {
+      const agg = await prisma.metricEntry.aggregate({
+        where: { customMetricId },
+        _max: { value: true },
+      });
+      return agg._max.value ?? null;
+    }
+    case "SUM": {
+      const agg = await prisma.metricEntry.aggregate({
+        where: { customMetricId },
+        _sum: { value: true },
+      });
+      return agg._sum.value ?? null;
+    }
+    case "AVG": {
+      const agg = await prisma.metricEntry.aggregate({
+        where: { customMetricId },
+        _avg: { value: true },
+      });
+      return agg._avg.value ?? null;
+    }
+    case "COUNT": {
+      const n = await prisma.metricEntry.count({ where: { customMetricId } });
+      return n;
+    }
+    default:
+      return null;
+  }
+}
+
+/**
  * Compute the current numeric value for a given metric key, for the given
  * profile. Returns null when the user has no data yet.
  *
@@ -168,7 +221,7 @@ export async function computeMetricValue(
 }
 
 /** Resolve fresh currentValue for an array of goals — leaves goals without
- *  metricKey untouched. Returns a new array of the same shape. */
+ *  metricKey/customMetricId untouched. Returns a new array of the same shape. */
 export async function withDerivedCurrent<
   T extends {
     id: string;
@@ -176,11 +229,15 @@ export async function withDerivedCurrent<
     metricKey: string | null;
     currentValue: number | null;
     activityTypeId?: string | null;
+    customMetricId?: string | null;
   },
 >(goals: T[]): Promise<T[]> {
   const out: T[] = [];
   for (const g of goals) {
-    if (g.metricKey) {
+    if (g.customMetricId) {
+      const v = await computeCustomMetricValue(g.customMetricId);
+      out.push({ ...g, currentValue: v });
+    } else if (g.metricKey) {
       const v = await computeMetricValue(g.profileId, g.metricKey, g.activityTypeId ?? null);
       out.push({ ...g, currentValue: v });
     } else {

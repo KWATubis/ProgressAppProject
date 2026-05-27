@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { findMetric } from "@/lib/goalMetrics";
-import { computeMetricValue } from "@/lib/goalMetrics.server";
+import { computeCustomMetricValue, computeMetricValue } from "@/lib/goalMetrics.server";
 
 const upsertSchema = z.object({
   id: z.string().optional(),
@@ -18,6 +18,7 @@ const upsertSchema = z.object({
   targetDate: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   metricKey: z.string().nullable().optional(),
+  customMetricId: z.string().nullable().optional(),
   activityTypeId: z.string().nullable().optional(),
 });
 
@@ -52,13 +53,26 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
   }
   const data = parsed.data;
 
-  // Validate metricKey against the known list. If a metric is linked, the
-  // current value comes from the user's logged data — ignore whatever the
-  // client sent for currentValue/unit and use the metric's canonical unit.
+  // A goal links to either a built-in metric (metricKey) OR a user-defined
+  // custom metric (customMetricId) OR neither (manual). Custom takes
+  // precedence if both are sent — the UI shouldn't, but be defensive.
   let metricKey: string | null = null;
+  let customMetricId: string | null = null;
   let resolvedCurrent = data.currentValue ?? null;
   let resolvedUnit: string | null = data.unit?.trim() ? data.unit : null;
-  if (data.metricKey) {
+
+  if (data.customMetricId) {
+    const cm = await prisma.customMetric.findUnique({
+      where: { id: data.customMetricId },
+      select: { profileId: true, unit: true, activityTypeId: true },
+    });
+    if (!cm || cm.profileId !== user.id) {
+      return { error: "Custom metric not found." };
+    }
+    customMetricId = data.customMetricId;
+    resolvedCurrent = await computeCustomMetricValue(customMetricId);
+    resolvedUnit = cm.unit;
+  } else if (data.metricKey) {
     const metric = findMetric(data.metricKey);
     if (!metric) return { error: "Unknown metric." };
     if (metric.pillar !== data.pillar) {
@@ -79,10 +93,12 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
       });
       if (!existing) return { error: "Goal not found." };
 
-      // If the metric link changed, reset the baseline so progress is
+      // If either metric link changed, reset the baseline so progress is
       // measured from the new starting point.
-      const metricChanged = (existing.metricKey ?? null) !== metricKey;
-      const start = metricChanged
+      const metricLinkChanged =
+        (existing.metricKey ?? null) !== metricKey ||
+        (existing.customMetricId ?? null) !== customMetricId;
+      const start = metricLinkChanged
         ? deriveStartValue(resolvedCurrent, data.targetValue ?? null)
         : existing.startValue ??
           deriveStartValue(resolvedCurrent, data.targetValue ?? null);
@@ -98,6 +114,7 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
           startValue: start,
           unit: resolvedUnit,
           metricKey,
+          customMetricId,
           targetDate: data.targetDate ? new Date(data.targetDate) : null,
           isActive: data.isActive ?? true,
           activityTypeId: data.activityTypeId ?? null,
@@ -115,6 +132,7 @@ export async function upsertGoal(input: UpsertGoalInput): Promise<ActionResult> 
           startValue: deriveStartValue(resolvedCurrent, data.targetValue ?? null),
           unit: resolvedUnit,
           metricKey,
+          customMetricId,
           targetDate: data.targetDate ? new Date(data.targetDate) : null,
           isActive: data.isActive ?? true,
           activityTypeId: data.activityTypeId ?? null,
