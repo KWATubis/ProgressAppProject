@@ -233,7 +233,8 @@
       "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion; npx tsc --noEmit --project tsconfig.json 2>&1 | Select-Object -First 80)",
       "Bash(xxd)",
       "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion; $r = npx eslint components/body/Humanoid.tsx components/body/BodyMesh.tsx components/body/BodyScene.tsx components/body/BodyExplorer.tsx components/body/BodyDetailPanel.tsx 2>&1; \"exit=$LASTEXITCODE\"; if \\($LASTEXITCODE -ne 0\\) { $r | Out-String })",
-      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion; $r = npx eslint components/body/BodyMesh.tsx components/body/Humanoid.tsx 2>&1; \"exit=$LASTEXITCODE\"; if \\($LASTEXITCODE -ne 0\\) { $r | Out-String })"
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion; $r = npx eslint components/body/BodyMesh.tsx components/body/Humanoid.tsx 2>&1; \"exit=$LASTEXITCODE\"; if \\($LASTEXITCODE -ne 0\\) { $r | Out-String })",
+      "PowerShell($path = \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\\\\public\\\\models\\\\body.glb\"; $bytes = [System.IO.File]::ReadAllBytes\\($path\\) | Select-Object -First 4; [System.BitConverter]::ToString\\($bytes\\) -join ' ')"
     ]
   }
 }
