@@ -1,7 +1,6 @@
 "use client";
 
-import { X, Heart, Brain, Dumbbell } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Heart, Brain, Dumbbell } from "lucide-react";
 import type { MuscleGroup, MuscleState } from "@/lib/body/muscle-state";
 import { tirednessColor, tirednessLabel } from "@/lib/body/muscle-state";
 import type { BodySelection } from "./Humanoid";
@@ -18,7 +17,6 @@ type Props = {
   selection: BodySelection;
   muscleStates: Record<MuscleGroup, MuscleState>;
   wellnessTrend: WellnessTrendPoint[];
-  onClose: () => void;
 };
 
 const MUSCLE_LABELS: Record<MuscleGroup, string> = {
@@ -281,36 +279,10 @@ export function BodyDetailPanel({
   selection,
   muscleStates,
   wellnessTrend,
-  onClose,
 }: Props) {
-  if (!selection) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="text-sm font-medium">Click a body part</p>
-        <p className="text-xs text-muted-foreground">
-          Tap a muscle to see fatigue, the heart for HR + calories, or the head for
-          sleep.
-        </p>
-        <p className="mt-3 text-[10px] uppercase tracking-wider text-muted-foreground">
-          Drag to rotate · scroll to zoom
-        </p>
-      </div>
-    );
-  }
+  if (!selection) return null;
   return (
-    <div className="flex h-full flex-col p-4">
-      <div className="flex items-start justify-between">
-        <div className="flex-1" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="-mr-2 -mt-2 h-7 w-7"
-          onClick={onClose}
-          aria-label="Close"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+    <div className="flex h-full flex-col px-5 pb-5">
       <div className="flex-1 overflow-y-auto">
         {selection.kind === "muscle" ? (
           <MuscleDetail group={selection.group} states={muscleStates} />

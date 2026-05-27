@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { Card } from "@/components/ui/card";
+import { ArrowLeft } from "lucide-react";
 import type { MuscleGroup, MuscleState } from "@/lib/body/muscle-state";
 import {
   BodyDetailPanel,
@@ -13,8 +13,8 @@ import type { BodySelection } from "./Humanoid";
 const BodyScene = dynamic(() => import("./BodyScene"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-      Loading 3D scene…
+    <div className="flex h-full w-full items-center justify-center text-xs uppercase tracking-[0.3em] text-cyan-300/40">
+      Loading body scan…
     </div>
   ),
 });
@@ -26,52 +26,149 @@ type Props = {
 
 export function BodyExplorer({ muscleStates, wellnessTrend }: Props) {
   const [selection, setSelection] = useState<BodySelection>(null);
+  const mode = selection ? "focused" : "idle";
+
+  const trainedCount = useMemo(
+    () =>
+      Object.values(muscleStates).filter(
+        (s) => s.daysSince != null && s.daysSince <= 1,
+      ).length,
+    [muscleStates],
+  );
 
   return (
-    <Card className="relative overflow-hidden border-white/10 bg-gradient-to-br from-emerald-500/[0.04] via-white/[0.01] to-transparent">
-      <div className="grid h-[520px] grid-cols-1 md:grid-cols-[1fr_300px]">
-        <div className="relative">
-          <BodyScene
-            muscleStates={muscleStates}
-            selection={selection}
-            onSelect={setSelection}
-          />
-          <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-1">
-            <Legend />
+    <div className="relative h-[640px] w-full overflow-hidden rounded-2xl">
+      {/* Atmospheric backdrop */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 60% 80% at 30% 50%, rgba(91,227,255,0.12), transparent 60%), radial-gradient(ellipse 40% 60% at 70% 70%, rgba(58,168,255,0.05), transparent 60%)",
+          }}
+        />
+        <div
+          className="absolute inset-0 opacity-[0.05]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, #5be3ff 1px, transparent 1px), linear-gradient(to bottom, #5be3ff 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+        {/* scan-line sweep */}
+        <div
+          className="absolute inset-0 mix-blend-screen"
+          style={{
+            background:
+              "linear-gradient(to bottom, transparent 0%, transparent 49.5%, rgba(91,227,255,0.06) 50%, transparent 50.5%, transparent 100%)",
+            backgroundSize: "100% 4px",
+          }}
+        />
+      </div>
+
+      {/* HUD: top-left status */}
+      <div className="pointer-events-none absolute left-5 top-5 z-10 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="block h-1.5 w-1.5 animate-pulse rounded-full bg-cyan-400" />
+          <span className="text-[10px] uppercase tracking-[0.3em] text-cyan-300/80">
+            Body scan · live
+          </span>
+        </div>
+        <div className="space-y-0.5 text-[10px] uppercase tracking-wider text-cyan-200/40">
+          <div>
+            Trained today / yest{" "}
+            <span className="text-cyan-300/90 tabular-nums">{trainedCount}</span>
+          </div>
+          <div>
+            Groups tracked{" "}
+            <span className="text-cyan-300/90 tabular-nums">
+              {Object.keys(muscleStates).length}
+            </span>
           </div>
         </div>
-        <div className="border-t border-white/10 md:border-l md:border-t-0">
-          <BodyDetailPanel
-            selection={selection}
-            muscleStates={muscleStates}
-            wellnessTrend={wellnessTrend}
-            onClose={() => setSelection(null)}
-          />
+      </div>
+
+      {/* HUD: legend bottom-left */}
+      <div className="pointer-events-none absolute bottom-5 left-5 z-10">
+        <div className="space-y-1 text-[10px] uppercase tracking-wider">
+          <LegendRow color="#ef4444" label="Just trained" />
+          <LegendRow color="#f97316" label="Sore" />
+          <LegendRow color="#eab308" label="Recovering" />
+          <LegendRow color="#10b981" label="Rested" />
         </div>
       </div>
-    </Card>
+
+      {/* Hint — idle only */}
+      {mode === "idle" ? (
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 flex w-1/2 flex-col items-center justify-center px-10 text-right md:items-end">
+          <div className="max-w-xs">
+            <div className="text-[10px] uppercase tracking-[0.4em] text-cyan-300/60">
+              Your body
+            </div>
+            <h3 className="mt-3 text-3xl font-light leading-tight text-cyan-50">
+              Click a muscle, heart or head to drill in.
+            </h3>
+            <p className="mt-4 text-xs leading-relaxed text-cyan-200/40">
+              Holographic mirror of your last 30 days of training. Muscles glow
+              by recovery state — fresh red, working orange, recovering yellow,
+              ready green.
+            </p>
+            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-500/[0.05] px-3 py-1.5 text-[10px] uppercase tracking-widest text-cyan-200/80">
+              <span className="block h-1 w-1 animate-ping rounded-full bg-cyan-300" />
+              Awaiting input
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* 3D scene fills the container */}
+      <div className="absolute inset-0">
+        <BodyScene
+          muscleStates={muscleStates}
+          selection={selection}
+          onSelect={setSelection}
+          mode={mode}
+        />
+      </div>
+
+      {/* Detail panel slides in from right when focused */}
+      <div
+        className={`absolute right-5 top-5 bottom-5 z-20 w-[340px] transition-all duration-500 ease-out ${
+          mode === "focused"
+            ? "translate-x-0 opacity-100"
+            : "pointer-events-none translate-x-[120%] opacity-0"
+        }`}
+      >
+        <div className="relative h-full overflow-hidden rounded-xl border border-cyan-500/20 bg-[rgba(5,12,20,0.75)] shadow-[0_0_40px_-10px_rgba(91,227,255,0.4)] backdrop-blur-md">
+          <button
+            type="button"
+            onClick={() => setSelection(null)}
+            className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full border border-cyan-500/20 bg-cyan-500/5 px-2 py-1 text-[10px] uppercase tracking-wider text-cyan-200/80 transition-colors hover:bg-cyan-500/10"
+          >
+            <ArrowLeft className="h-3 w-3" />
+            Back
+          </button>
+          <div className="h-full pt-10">
+            <BodyDetailPanel
+              selection={selection}
+              muscleStates={muscleStates}
+              wellnessTrend={wellnessTrend}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function Legend() {
+function LegendRow({ color, label }: { color: string; label: string }) {
   return (
-    <div className="flex flex-col gap-1 rounded-md bg-black/40 px-2 py-1.5 text-[10px] uppercase tracking-wider backdrop-blur-sm">
-      <div className="flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
-        <span className="text-rose-200/80">Just trained</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-orange-500" />
-        <span className="text-orange-200/80">Sore</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
-        <span className="text-yellow-200/80">Recovering</span>
-      </div>
-      <div className="flex items-center gap-1.5">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-        <span className="text-emerald-200/80">Rested</span>
-      </div>
+    <div className="flex items-center gap-1.5">
+      <span
+        className="block h-1.5 w-1.5 rounded-full"
+        style={{ background: color, boxShadow: `0 0 6px ${color}` }}
+      />
+      <span style={{ color: `${color}b3` }}>{label}</span>
     </div>
   );
 }
