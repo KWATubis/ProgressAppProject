@@ -398,9 +398,12 @@ const SKIN_FRAG = /* glsl */ `
   varying vec3 vViewDir;
   void main() {
     float NdotV = clamp(dot(normalize(vViewNormal), normalize(vViewDir)), 0.0, 1.0);
-    float fresnel = pow(1.0 - NdotV, 2.6);
-    vec3 col = vColor * (0.05 + fresnel * 0.6);
-    float alpha = clamp(fresnel * 0.35 + 0.05, 0.0, 0.5);
+    // Strong rim glow + softer inner body fill so the hologram reads as a
+    // solid lit volume instead of a thin outline.
+    float fresnel = pow(1.0 - NdotV, 1.9);
+    float core = pow(NdotV, 1.4) * 0.22;
+    vec3 col = vColor * (0.18 + fresnel * 1.05 + core);
+    float alpha = clamp(fresnel * 0.65 + 0.18, 0.0, 0.85);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -419,12 +422,7 @@ export function BodyMesh({
     if (!gltf?.scene) {
       return {
         group: null as THREE.Group | null,
-        perMesh: [] as Array<{
-          skinIndices: Int8Array;
-          skinColor: THREE.BufferAttribute;
-          edgeIndices: Int8Array;
-          edgeColor: THREE.BufferAttribute;
-        }>,
+        perMesh: [] as Array<{ indices: Int8Array; color: THREE.BufferAttribute }>,
         scale: 1,
         offset: new THREE.Vector3(),
       };
@@ -504,34 +502,35 @@ export function BodyMesh({
     const ySize = size.y || 1;
 
     const out = new THREE.Group();
-    const perMesh: Array<{
-      skinIndices: Int8Array;
-      skinColor: THREE.BufferAttribute;
-      edgeIndices: Int8Array;
-      edgeColor: THREE.BufferAttribute;
-    }> = [];
+    type ColorLayer = { indices: Int8Array; color: THREE.BufferAttribute };
+    const perMesh: ColorLayer[] = [];
     const cyan = new THREE.Color(baseColor);
 
-    for (const geom of baked) {
-      // --- Skin shell color attribute ---
-      const posAttr = geom.getAttribute("position") as THREE.BufferAttribute;
-      const skinCount = posAttr.count;
-      const skinIndices = new Int8Array(skinCount);
-      const skinColors = new Float32Array(skinCount * 3);
-      for (let i = 0; i < skinCount; i++) {
-        const x = posAttr.getX(i);
-        const y = posAttr.getY(i);
-        const z = posAttr.getZ(i);
+    const classifyAttr = (attr: THREE.BufferAttribute): ColorLayer => {
+      const count = attr.count;
+      const indices = new Int8Array(count);
+      const colors = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const x = attr.getX(i);
+        const y = attr.getY(i);
+        const z = attr.getZ(i);
         const nx = (x - center.x) / halfX;
         const ny = (y - yMin) / ySize;
         const nz = (z - center.z) / halfZ;
-        skinIndices[i] = classifyVertex(nx, ny, nz);
-        skinColors[i * 3] = cyan.r;
-        skinColors[i * 3 + 1] = cyan.g;
-        skinColors[i * 3 + 2] = cyan.b;
+        indices[i] = classifyVertex(nx, ny, nz);
+        colors[i * 3] = cyan.r;
+        colors[i * 3 + 1] = cyan.g;
+        colors[i * 3 + 2] = cyan.b;
       }
-      const skinColor = new THREE.BufferAttribute(skinColors, 3);
-      geom.setAttribute("color", skinColor);
+      const colorAttr = new THREE.BufferAttribute(colors, 3);
+      return { indices, color: colorAttr };
+    };
+
+    for (const geom of baked) {
+      // --- Skin shell: solid holographic fill (fresnel + soft core) ---
+      const posAttr = geom.getAttribute("position") as THREE.BufferAttribute;
+      const skinLayer = classifyAttr(posAttr);
+      geom.setAttribute("color", skinLayer.color);
 
       const skinMat = new THREE.ShaderMaterial({
         vertexShader: SKIN_VERT,
@@ -547,42 +546,47 @@ export function BodyMesh({
       skinMesh.renderOrder = 0;
       skinMesh.frustumCulled = false;
       out.add(skinMesh);
+      perMesh.push(skinLayer);
 
-      // --- Edge lines: contour + moderate detail ---
-      const edgesGeom = new THREE.EdgesGeometry(geom, 10); // 10° = light triangulation texture
-      const edgePos = edgesGeom.getAttribute("position") as THREE.BufferAttribute;
-      const edgeCount = edgePos.count;
-      const edgeIndices = new Int8Array(edgeCount);
-      const edgeColors = new Float32Array(edgeCount * 3);
-      for (let i = 0; i < edgeCount; i++) {
-        const x = edgePos.getX(i);
-        const y = edgePos.getY(i);
-        const z = edgePos.getZ(i);
-        const nx = (x - center.x) / halfX;
-        const ny = (y - yMin) / ySize;
-        const nz = (z - center.z) / halfZ;
-        edgeIndices[i] = classifyVertex(nx, ny, nz);
-        edgeColors[i * 3] = cyan.r;
-        edgeColors[i * 3 + 1] = cyan.g;
-        edgeColors[i * 3 + 2] = cyan.b;
-      }
-      const edgeColor = new THREE.BufferAttribute(edgeColors, 3);
-      edgesGeom.setAttribute("color", edgeColor);
+      // --- Layer A: full triangulated wireframe (every face edge) ---
+      const wireGeom = new THREE.WireframeGeometry(geom);
+      const wireLayer = classifyAttr(
+        wireGeom.getAttribute("position") as THREE.BufferAttribute,
+      );
+      wireGeom.setAttribute("color", wireLayer.color);
+      const wireMat = new THREE.LineBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.32,
+        depthWrite: false,
+        toneMapped: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const wireLines = new THREE.LineSegments(wireGeom, wireMat);
+      wireLines.renderOrder = 1;
+      wireLines.frustumCulled = false;
+      out.add(wireLines);
+      perMesh.push(wireLayer);
 
+      // --- Layer B: silhouette + sharp creases (bright accent over the mesh) ---
+      const edgesGeom = new THREE.EdgesGeometry(geom, 28);
+      const edgeLayer = classifyAttr(
+        edgesGeom.getAttribute("position") as THREE.BufferAttribute,
+      );
+      edgesGeom.setAttribute("color", edgeLayer.color);
       const lineMat = new THREE.LineBasicMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.55,
+        opacity: 0.85,
         depthWrite: false,
         toneMapped: false,
-        blending: THREE.NormalBlending,
+        blending: THREE.AdditiveBlending,
       });
       const lines = new THREE.LineSegments(edgesGeom, lineMat);
       lines.renderOrder = 2;
       lines.frustumCulled = false;
       out.add(lines);
-
-      perMesh.push({ skinIndices, skinColor, edgeIndices, edgeColor });
+      perMesh.push(edgeLayer);
     }
 
     // ---- Muscle definition outlines (pec ovals, ab 6-pack, biceps, etc) ----
@@ -617,23 +621,17 @@ export function BodyMesh({
       const outlineMat = new THREE.LineBasicMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.95,
+        opacity: 1.0,
         depthWrite: false,
         toneMapped: false,
-        blending: THREE.NormalBlending,
+        blending: THREE.AdditiveBlending,
       });
       const outlineLines = new THREE.LineSegments(outlineGeom, outlineMat);
       outlineLines.renderOrder = 3;
       outlineLines.frustumCulled = false;
       out.add(outlineLines);
 
-      // Track outline colors as a fake "perMesh" entry so the recolor pass picks it up.
-      perMesh.push({
-        skinIndices: new Int8Array(0),
-        skinColor: new THREE.BufferAttribute(new Float32Array(0), 3),
-        edgeIndices: outlineIndices,
-        edgeColor: outlineColorAttr,
-      });
+      perMesh.push({ indices: outlineIndices, color: outlineColorAttr });
     }
 
     const s = targetHeight / ySize;
@@ -684,9 +682,13 @@ export function BodyMesh({
       attr.needsUpdate = true;
     };
 
+    // React 19's immutability rule treats values returned from useMemo as
+    // immutable. We deliberately mutate the BufferAttribute's typed array +
+    // flip needsUpdate — that's how three.js streams vertex-color changes to
+    // the GPU. Disable the rule for this targeted mutation.
     for (const m of perMesh) {
-      apply(m.skinIndices, m.skinColor);
-      apply(m.edgeIndices, m.edgeColor);
+      // eslint-disable-next-line react-hooks/immutability
+      apply(m.indices, m.color);
     }
   }, [perMesh, muscleStates, hoveredGroup, selectedGroup, baseColor]);
 

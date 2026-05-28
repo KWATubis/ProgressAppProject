@@ -241,10 +241,11 @@ export default function BodyScene({ muscleStates, selection, onSelect, mode }: P
       {mode !== "preview" ? <color attach="background" args={["#04080d"]} /> : null}
       {mode !== "preview" ? <fog attach="fog" args={["#04080d", 6, 11]} /> : null}
 
-      <ambientLight intensity={0.25} />
-      <directionalLight position={[2, 4, 3]} intensity={0.3} color="#6cc6ff" />
-      <pointLight position={[-1.5, 2.5, 1.5]} intensity={0.4} color="#5be3ff" />
-      <pointLight position={[1.5, 2, -1.5]} intensity={0.2} color="#3a7dff" />
+      <ambientLight intensity={0.55} color="#9be7ff" />
+      <directionalLight position={[2, 4, 3]} intensity={0.55} color="#9bd7ff" />
+      <pointLight position={[-1.5, 2.5, 1.5]} intensity={0.7} color="#5be3ff" />
+      <pointLight position={[1.5, 2, -1.5]} intensity={0.4} color="#3a7dff" />
+      <pointLight position={[0, 1.2, 2.4]} intensity={0.45} color="#7ce8ff" />
 
       <Suspense fallback={null}>
         <Humanoid
@@ -272,11 +273,11 @@ export default function BodyScene({ muscleStates, selection, onSelect, mode }: P
 
       <EffectComposer multisampling={0} enableNormalPass={false}>
         <Bloom
-          intensity={mode === "preview" ? 0.12 : 0.18}
-          luminanceThreshold={0.85}
-          luminanceSmoothing={0.4}
+          intensity={mode === "preview" ? 0.55 : 0.85}
+          luminanceThreshold={0.32}
+          luminanceSmoothing={0.55}
           mipmapBlur
-          radius={0.35}
+          radius={0.7}
         />
         <Vignette
           offset={0.25}
