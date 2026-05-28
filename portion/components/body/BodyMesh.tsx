@@ -1,77 +1,32 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
+import { useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
-import {
-  MUSCLE_GROUPS,
-  type MuscleGroup,
-  type MuscleState,
-  tirednessColor,
-} from "@/lib/body/muscle-state";
+import type { MuscleGroup, MuscleState } from "@/lib/body/muscle-state";
 
 /**
- * Holographic wireframe body — per-muscle color, contour lines only.
+ * Holographic wireframe body. Muscle definition is painted into the fragment
+ * shader as analytical SDF rings (one ellipse per muscle group), evaluated
+ * against the baked local position. The lines conform to the body surface
+ * because they're computed per-fragment — no floating geometry.
  *
- * Pipeline:
- *   1) Pose the X-Bot skeleton (arms down) + bake the skinned vertices into a
- *      static, non-skinned BufferGeometry.
- *   2) Distort the vertices for a more masculine silhouette — widen shoulders,
- *      narrow the waist a touch.
- *   3) For each FACE-mesh, derive an EdgesGeometry (LineSegments). This keeps
- *      only contour/silhouette lines and drops the dense triangulation, which
- *      is the look in the reference scan.
- *   4) Classify every vertex of the edge lines by muscle group → vertex colors.
- *      A faint fresnel shell underneath fills in the body softly.
- *   5) On muscleStates/hover/select change, repaint vertex colors so the whole
- *      body reads green when rested, regions shift red when freshly trained.
+ * The full-skin wireframe + a sharper silhouette/crease pass ride on top to
+ * give the dense topology look from the reference scan.
  */
 
 type Props = {
   targetHeight?: number;
   floorY?: number;
   baseColor?: string;
-  muscleStates: Record<MuscleGroup, MuscleState>;
+  /** Kept for backwards-compat with the explorer wiring — unused for now. */
+  muscleStates?: Record<MuscleGroup, MuscleState>;
   hoveredGroup?: MuscleGroup | null;
   selectedGroup?: MuscleGroup | null;
 };
 
 useGLTF.preload("/models/body.glb");
-
-const NEUTRAL = -1;
-const GROUP_INDEX: Record<MuscleGroup, number> = MUSCLE_GROUPS.reduce(
-  (acc, g, i) => {
-    acc[g] = i;
-    return acc;
-  },
-  {} as Record<MuscleGroup, number>,
-);
-
-function classifyVertex(nx: number, ny: number, nz: number): number {
-  if (ny > 0.86) return NEUTRAL; // head + neck
-  if (ny < 0.04) return NEUTRAL; // feet
-  if (ny < 0.52 && Math.abs(nx) > 0.55) return NEUTRAL; // hands
-
-  const ax = Math.abs(nx);
-
-  if (ax > 0.42) {
-    if (ny > 0.78) return GROUP_INDEX.shoulders;
-    if (ny > 0.62) return nz >= 0 ? GROUP_INDEX.biceps : GROUP_INDEX.triceps;
-    return GROUP_INDEX.forearms;
-  }
-
-  if (ny > 0.74) return nz >= 0 ? GROUP_INDEX.chest : GROUP_INDEX.back;
-  if (ny > 0.56) return nz >= 0 ? GROUP_INDEX.abs : GROUP_INDEX.back;
-
-  if (ny > 0.48) {
-    if (nz < -0.05) return GROUP_INDEX.glutes;
-    return NEUTRAL;
-  }
-
-  if (ny > 0.22) return nz >= 0 ? GROUP_INDEX.quads : GROUP_INDEX.hamstrings;
-  if (ny > 0.04) return GROUP_INDEX.calves;
-  return NEUTRAL;
-}
 
 function poseBone(
   skeleton: THREE.Skeleton,
@@ -87,251 +42,8 @@ function poseBone(
   if (euler.z != null) bone.rotation.z = euler.z;
 }
 
-// ---------- Muscle outline geometry helpers ----------
-type V3 = [number, number, number];
-
-function ellipseLoop(center: V3, axisU: V3, axisV: V3, segments = 32): V3[] {
-  const pts: V3[] = [];
-  for (let i = 0; i <= segments; i++) {
-    const t = (i / segments) * Math.PI * 2;
-    const c = Math.cos(t);
-    const s = Math.sin(t);
-    pts.push([
-      center[0] + axisU[0] * c + axisV[0] * s,
-      center[1] + axisU[1] * c + axisV[1] * s,
-      center[2] + axisU[2] * c + axisV[2] * s,
-    ]);
-  }
-  return pts;
-}
-
-function roundedRectLoop(center: V3, halfW: number, halfH: number, radius: number, segments = 6): V3[] {
-  const z = center[2];
-  const cx = center[0];
-  const cy = center[1];
-  const r = Math.min(radius, halfW, halfH);
-  const pts: V3[] = [];
-  // 4 corner arcs
-  const corners: Array<[number, number, number, number]> = [
-    [cx + halfW - r, cy - halfH + r, Math.PI * 1.5, Math.PI * 2.0], // bottom-right
-    [cx + halfW - r, cy + halfH - r, 0, Math.PI * 0.5],             // top-right
-    [cx - halfW + r, cy + halfH - r, Math.PI * 0.5, Math.PI * 1.0], // top-left
-    [cx - halfW + r, cy - halfH + r, Math.PI * 1.0, Math.PI * 1.5], // bottom-left
-  ];
-  for (const [ax, ay, a0, a1] of corners) {
-    for (let i = 0; i <= segments; i++) {
-      const t = a0 + (a1 - a0) * (i / segments);
-      pts.push([ax + Math.cos(t) * r, ay + Math.sin(t) * r, z]);
-    }
-  }
-  pts.push(pts[0]); // close
-  return pts;
-}
-
-function linePath(...pts: V3[]): V3[] {
-  return pts;
-}
-
-/** Push every point of a path slightly along (x, 0, z) so the outline sits
- * outside the body surface and reads cleanly. */
-function inflate(points: V3[], amount: number): V3[] {
-  return points.map(([x, y, z]) => {
-    const r = Math.hypot(x, z);
-    if (r < 1e-4) return [x, y, z];
-    return [x + (x / r) * amount, y, z + (z / r) * amount];
-  });
-}
-
-/** Convert an open polyline into LineSegments index pairs: N points → N-1 segments. */
-function pathToSegmentPositions(points: V3[], out: number[]) {
-  for (let i = 0; i < points.length - 1; i++) {
-    out.push(...points[i], ...points[i + 1]);
-  }
-}
-
-/**
- * Anatomical muscle outlines, in WORLD coordinates of the baked body
- * (arms-down, 1.88m tall, feet at y=0). Each entry contributes a polyline
- * that gets converted to LineSegments and tinted by its muscle group.
- */
-function buildMuscleOutlines(): Array<{ group: MuscleGroup; points: V3[] }> {
-  const out: Array<{ group: MuscleGroup; points: V3[] }> = [];
-
-  // ----- PECS -----
-  out.push({
-    group: "chest",
-    points: ellipseLoop([-0.085, 1.435, 0.118], [0.075, 0, 0.01], [0, 0.055, 0], 28),
-  });
-  out.push({
-    group: "chest",
-    points: ellipseLoop([0.085, 1.435, 0.118], [0.075, 0, -0.01], [0, 0.055, 0], 28),
-  });
-  // Pec sternum cleft
-  out.push({
-    group: "chest",
-    points: linePath([0, 1.49, 0.117], [0, 1.39, 0.122]),
-  });
-
-  // ----- ABS (6-pack) -----
-  const absRows = [1.33, 1.26, 1.19];
-  for (const yRow of absRows) {
-    out.push({
-      group: "abs",
-      points: roundedRectLoop([-0.04, yRow, 0.137], 0.032, 0.028, 0.012, 4),
-    });
-    out.push({
-      group: "abs",
-      points: roundedRectLoop([0.04, yRow, 0.137], 0.032, 0.028, 0.012, 4),
-    });
-  }
-  // Linea alba (vertical line down the middle)
-  out.push({
-    group: "abs",
-    points: linePath([0, 1.36, 0.138], [0, 1.16, 0.138]),
-  });
-  // Obliques (curves flanking the abs)
-  out.push({
-    group: "abs",
-    points: linePath(
-      [-0.085, 1.32, 0.105],
-      [-0.10, 1.27, 0.09],
-      [-0.105, 1.22, 0.08],
-      [-0.10, 1.16, 0.07],
-    ),
-  });
-  out.push({
-    group: "abs",
-    points: linePath(
-      [0.085, 1.32, 0.105],
-      [0.10, 1.27, 0.09],
-      [0.105, 1.22, 0.08],
-      [0.10, 1.16, 0.07],
-    ),
-  });
-  // Lower pec / chest-to-ab transition
-  out.push({
-    group: "chest",
-    points: linePath([-0.13, 1.40, 0.10], [-0.04, 1.38, 0.122]),
-  });
-  out.push({
-    group: "chest",
-    points: linePath([0.13, 1.40, 0.10], [0.04, 1.38, 0.122]),
-  });
-
-  // ----- DELTOIDS -----
-  out.push({
-    group: "shoulders",
-    points: ellipseLoop([-0.215, 1.52, 0.005], [0, 0, 0.075], [0, 0.06, 0], 28),
-  });
-  out.push({
-    group: "shoulders",
-    points: ellipseLoop([0.215, 1.52, 0.005], [0, 0, 0.075], [0, 0.06, 0], 28),
-  });
-
-  // ----- BICEPS -----
-  out.push({
-    group: "biceps",
-    points: ellipseLoop([-0.225, 1.33, 0.058], [0.042, 0, 0], [0, 0.082, 0], 26),
-  });
-  out.push({
-    group: "biceps",
-    points: ellipseLoop([0.225, 1.33, 0.058], [0.042, 0, 0], [0, 0.082, 0], 26),
-  });
-
-  // ----- TRICEPS -----
-  out.push({
-    group: "triceps",
-    points: ellipseLoop([-0.225, 1.33, -0.058], [0.042, 0, 0], [0, 0.085, 0], 26),
-  });
-  out.push({
-    group: "triceps",
-    points: ellipseLoop([0.225, 1.33, -0.058], [0.042, 0, 0], [0, 0.085, 0], 26),
-  });
-
-  // ----- FOREARMS -----
-  out.push({
-    group: "forearms",
-    points: ellipseLoop([-0.225, 1.07, 0.025], [0.04, 0, 0], [0, 0.095, 0], 24),
-  });
-  out.push({
-    group: "forearms",
-    points: ellipseLoop([0.225, 1.07, 0.025], [0.04, 0, 0], [0, 0.095, 0], 24),
-  });
-
-  // ----- LATS / BACK -----
-  out.push({
-    group: "back",
-    points: ellipseLoop([-0.10, 1.35, -0.128], [0.06, 0, 0], [0, 0.135, 0], 28),
-  });
-  out.push({
-    group: "back",
-    points: ellipseLoop([0.10, 1.35, -0.128], [0.06, 0, 0], [0, 0.135, 0], 28),
-  });
-  // Spine line
-  out.push({
-    group: "back",
-    points: linePath([0, 1.50, -0.13], [0, 1.55, -0.105], [0, 1.50, -0.13], [0, 1.10, -0.13]),
-  });
-
-  // ----- GLUTES -----
-  out.push({
-    group: "glutes",
-    points: ellipseLoop([-0.085, 0.93, -0.108], [0.07, 0, 0], [0, 0.08, 0], 26),
-  });
-  out.push({
-    group: "glutes",
-    points: ellipseLoop([0.085, 0.93, -0.108], [0.07, 0, 0], [0, 0.08, 0], 26),
-  });
-
-  // ----- QUADS (front of thigh) -----
-  out.push({
-    group: "quads",
-    points: ellipseLoop([-0.11, 0.62, 0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
-  });
-  out.push({
-    group: "quads",
-    points: ellipseLoop([0.11, 0.62, 0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
-  });
-  // Vastus medialis (inner-knee teardrop)
-  out.push({
-    group: "quads",
-    points: ellipseLoop([-0.08, 0.5, 0.085], [0.022, 0, 0], [0, 0.05, 0], 18),
-  });
-  out.push({
-    group: "quads",
-    points: ellipseLoop([0.08, 0.5, 0.085], [0.022, 0, 0], [0, 0.05, 0], 18),
-  });
-
-  // ----- HAMSTRINGS -----
-  out.push({
-    group: "hamstrings",
-    points: ellipseLoop([-0.11, 0.62, -0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
-  });
-  out.push({
-    group: "hamstrings",
-    points: ellipseLoop([0.11, 0.62, -0.082], [0.052, 0, 0], [0, 0.14, 0], 30),
-  });
-
-  // ----- CALVES -----
-  out.push({
-    group: "calves",
-    points: ellipseLoop([-0.11, 0.27, -0.07], [0.04, 0, 0], [0, 0.085, 0], 24),
-  });
-  out.push({
-    group: "calves",
-    points: ellipseLoop([0.11, 0.27, -0.07], [0.04, 0, 0], [0, 0.085, 0], 24),
-  });
-
-  // Inflate every outline slightly so it floats off the body surface and
-  // doesn't z-fight with the underlying wireframe.
-  return out.map((o) => ({ ...o, points: inflate(o.points, 0.006) }));
-}
-
-/**
- * Reshape vertices for a more masculine V-taper. Operates AFTER bones are
- * baked — moves torso-only vertices (small |x|) so arms hanging at the sides
- * are left alone.
- */
+/** Pushes torso vertices for a masculine V-taper. Operates AFTER bones are
+ *  baked — leaves arms hanging at the sides alone. */
 function masculinize(
   geom: THREE.BufferGeometry,
   yMin: number,
@@ -349,19 +61,15 @@ function masculinize(
     const dx = x - centerX;
     const torsoness = Math.max(0, 1 - Math.abs(dx) / (halfX * 0.45));
 
-    // Shoulder widening (smooth bell at upper torso)
     const shoulderProfile = Math.exp(-Math.pow((ny - 0.82) / 0.06, 2));
     const xWiden = 1 + 0.32 * shoulderProfile * torsoness;
 
-    // Waist narrowing (small dip around the natural waist)
     const waistProfile = Math.exp(-Math.pow((ny - 0.58) / 0.05, 2));
     const xNarrow = 1 - 0.07 * waistProfile * torsoness;
 
-    // Chest depth — push +z slightly forward on the front, -z on the back
     const chestProfile = Math.exp(-Math.pow((ny - 0.76) / 0.08, 2));
     const zScale = 1 + 0.18 * chestProfile * torsoness;
 
-    // Bulk upper-arm region a touch
     const isArm = Math.abs(dx) > halfX * 0.5;
     const upperArm = isArm
       ? Math.exp(-Math.pow((ny - 0.7) / 0.08, 2)) * 0.08
@@ -377,12 +85,14 @@ function masculinize(
   geom.computeBoundingBox();
 }
 
+// ---------- Shaders ----------
+
 const SKIN_VERT = /* glsl */ `
-  varying vec3 vColor;
+  varying vec3 vModelPos;
   varying vec3 vViewNormal;
   varying vec3 vViewDir;
   void main() {
-    vColor = color;
+    vModelPos = position;
     vec4 worldPos = modelMatrix * vec4(position, 1.0);
     vec4 viewPos = viewMatrix * worldPos;
     vViewNormal = normalize(normalMatrix * normal);
@@ -391,19 +101,128 @@ const SKIN_VERT = /* glsl */ `
   }
 `;
 
+/**
+ * Each muscle is an ellipse in (x, y) plane. We compute distance from the
+ * fragment's local position to the ellipse boundary; a thin ring around the
+ * boundary lights up. Z-masks gate front vs back muscles.
+ *
+ * Coordinates are in the BAKED X-Bot local space (post-masculinize):
+ *   y ≈ 1.43 → mid-chest, y ≈ 0.62 → mid-thigh, y ≈ 0.27 → calf.
+ *   x ≈ ±0.085 → pec center, x ≈ ±0.225 → arm centerline.
+ *   z > 0 → front, z < 0 → back.
+ */
 const SKIN_FRAG = /* glsl */ `
   precision highp float;
-  varying vec3 vColor;
+  varying vec3 vModelPos;
   varying vec3 vViewNormal;
   varying vec3 vViewDir;
+  uniform vec3 uBaseColor;
+  uniform float uTime;
+
+  float ringE(vec2 p, vec2 c, vec2 r, float thickness) {
+    vec2 d = (p - c) / r;
+    float dist = abs(length(d) - 1.0);
+    return smoothstep(thickness, 0.0, dist);
+  }
+
+  float vLine(vec2 p, float cx, vec2 yRange, float thickness) {
+    float inside = step(yRange.x, p.y) * step(p.y, yRange.y);
+    return inside * smoothstep(thickness, 0.0, abs(p.x - cx));
+  }
+
+  float curve(vec2 p, vec2 a, vec2 b, float thickness) {
+    vec2 ab = b - a;
+    float t = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
+    vec2 proj = a + ab * t;
+    return smoothstep(thickness, 0.0, length(p - proj));
+  }
+
+  float muscles(vec3 p) {
+    float i = 0.0;
+    float front = smoothstep(0.0, 0.04, p.z);
+    float back = smoothstep(0.0, 0.04, -p.z);
+
+    // ===== UPPER BODY (FRONT) =====
+    // Pectorals
+    i = max(i, front * ringE(p.xy, vec2(-0.090, 1.435), vec2(0.085, 0.060), 0.006));
+    i = max(i, front * ringE(p.xy, vec2( 0.090, 1.435), vec2(0.085, 0.060), 0.006));
+    // Sternum line
+    i = max(i, front * vLine(p.xy, 0.0, vec2(1.38, 1.49), 0.0035));
+
+    // Six-pack abs (3 rows × 2 columns)
+    for (int r = 0; r < 3; r++) {
+      float y = 1.34 - float(r) * 0.065;
+      i = max(i, front * ringE(p.xy, vec2(-0.040, y), vec2(0.030, 0.028), 0.0040));
+      i = max(i, front * ringE(p.xy, vec2( 0.040, y), vec2(0.030, 0.028), 0.0040));
+    }
+    // Linea alba
+    i = max(i, front * vLine(p.xy, 0.0, vec2(1.15, 1.38), 0.0030));
+
+    // Obliques (V-curve flanking the abs)
+    i = max(i, front * curve(p.xy, vec2(-0.085, 1.32), vec2(-0.10, 1.15), 0.0045));
+    i = max(i, front * curve(p.xy, vec2( 0.085, 1.32), vec2( 0.10, 1.15), 0.0045));
+
+    // ===== SHOULDERS =====
+    // Deltoids — front & back both
+    i = max(i, ringE(p.xy, vec2(-0.215, 1.515), vec2(0.072, 0.060), 0.0055));
+    i = max(i, ringE(p.xy, vec2( 0.215, 1.515), vec2(0.072, 0.060), 0.0055));
+
+    // ===== ARMS =====
+    // Biceps (front)
+    i = max(i, front * ringE(p.xy, vec2(-0.225, 1.330), vec2(0.044, 0.080), 0.0045));
+    i = max(i, front * ringE(p.xy, vec2( 0.225, 1.330), vec2(0.044, 0.080), 0.0045));
+    // Triceps (back)
+    i = max(i, back  * ringE(p.xy, vec2(-0.225, 1.330), vec2(0.044, 0.082), 0.0045));
+    i = max(i, back  * ringE(p.xy, vec2( 0.225, 1.330), vec2(0.044, 0.082), 0.0045));
+    // Forearms (visible from both sides)
+    i = max(i, ringE(p.xy, vec2(-0.225, 1.070), vec2(0.042, 0.095), 0.0045));
+    i = max(i, ringE(p.xy, vec2( 0.225, 1.070), vec2(0.042, 0.095), 0.0045));
+
+    // ===== BACK =====
+    // Lats
+    i = max(i, back * ringE(p.xy, vec2(-0.105, 1.340), vec2(0.062, 0.128), 0.0050));
+    i = max(i, back * ringE(p.xy, vec2( 0.105, 1.340), vec2(0.062, 0.128), 0.0050));
+    // Spine line
+    i = max(i, back * vLine(p.xy, 0.0, vec2(1.15, 1.55), 0.0030));
+    // Glutes
+    i = max(i, back * ringE(p.xy, vec2(-0.090, 0.940), vec2(0.078, 0.075), 0.0050));
+    i = max(i, back * ringE(p.xy, vec2( 0.090, 0.940), vec2(0.078, 0.075), 0.0050));
+
+    // ===== LEGS =====
+    // Quads
+    i = max(i, front * ringE(p.xy, vec2(-0.110, 0.620), vec2(0.056, 0.135), 0.0050));
+    i = max(i, front * ringE(p.xy, vec2( 0.110, 0.620), vec2(0.056, 0.135), 0.0050));
+    // Inner-knee teardrop (vastus medialis)
+    i = max(i, front * ringE(p.xy, vec2(-0.080, 0.500), vec2(0.022, 0.045), 0.0035));
+    i = max(i, front * ringE(p.xy, vec2( 0.080, 0.500), vec2(0.022, 0.045), 0.0035));
+    // Hamstrings
+    i = max(i, back * ringE(p.xy, vec2(-0.110, 0.620), vec2(0.056, 0.135), 0.0050));
+    i = max(i, back * ringE(p.xy, vec2( 0.110, 0.620), vec2(0.056, 0.135), 0.0050));
+    // Calves
+    i = max(i, back * ringE(p.xy, vec2(-0.110, 0.275), vec2(0.040, 0.085), 0.0045));
+    i = max(i, back * ringE(p.xy, vec2( 0.110, 0.275), vec2(0.040, 0.085), 0.0045));
+
+    return clamp(i, 0.0, 1.0);
+  }
+
   void main() {
-    float NdotV = clamp(dot(normalize(vViewNormal), normalize(vViewDir)), 0.0, 1.0);
-    // Strong rim glow + softer inner body fill so the hologram reads as a
-    // solid lit volume instead of a thin outline.
-    float fresnel = pow(1.0 - NdotV, 1.9);
-    float core = pow(NdotV, 1.4) * 0.22;
-    vec3 col = vColor * (0.18 + fresnel * 1.05 + core);
-    float alpha = clamp(fresnel * 0.65 + 0.18, 0.0, 0.85);
+    vec3 N = normalize(vViewNormal);
+    vec3 V = normalize(vViewDir);
+    float NdotV = clamp(dot(N, V), 0.0, 1.0);
+    float fresnel = pow(1.0 - NdotV, 1.7);
+    float core = pow(NdotV, 1.4) * 0.18;
+
+    float lineI = muscles(vModelPos);
+
+    // Soft vertical scan pulse to keep the hologram alive.
+    float scan = 0.5 + 0.5 * sin(vModelPos.y * 55.0 - uTime * 1.1);
+    scan = smoothstep(0.86, 1.0, scan) * 0.05;
+
+    vec3 baseCol = uBaseColor * (0.16 + fresnel * 0.95 + core);
+    vec3 lineCol = uBaseColor * 3.2 + vec3(0.35, 0.55, 0.70);
+    vec3 col = baseCol + lineI * lineCol + scan * uBaseColor;
+
+    float alpha = clamp(fresnel * 0.62 + 0.20 + lineI * 0.45, 0.0, 0.95);
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -412,19 +231,16 @@ export function BodyMesh({
   targetHeight = 1.88,
   floorY = 0,
   baseColor = "#5be3ff",
-  muscleStates,
-  hoveredGroup = null,
-  selectedGroup = null,
 }: Props) {
   const gltf = useGLTF("/models/body.glb");
 
-  const { group, perMesh, scale, offset } = useMemo(() => {
+  const { group, scale, offset, materials } = useMemo(() => {
     if (!gltf?.scene) {
       return {
         group: null as THREE.Group | null,
-        perMesh: [] as Array<{ indices: Int8Array; color: THREE.BufferAttribute }>,
         scale: 1,
         offset: new THREE.Vector3(),
+        materials: [] as THREE.ShaderMaterial[],
       };
     }
 
@@ -441,11 +257,13 @@ export function BodyMesh({
       poseBone(skeleton, "RightArm", { z: Math.PI / 2 - 0.16 });
       poseBone(skeleton, "LeftForeArm", { y: 0.12 });
       poseBone(skeleton, "RightForeArm", { y: -0.12 });
-      (skeleton as THREE.Skeleton).bones.forEach((b) => b.updateMatrixWorld(true));
+      (skeleton as THREE.Skeleton).bones.forEach((b) =>
+        b.updateMatrixWorld(true),
+      );
       (skeleton as THREE.Skeleton).update();
     }
 
-    // ---- Bake skinning ----
+    // ---- Bake skinning into static geometry ----
     const baked: THREE.BufferGeometry[] = [];
     const tempVec = new THREE.Vector3();
     gltf.scene.traverse((obj) => {
@@ -475,7 +293,7 @@ export function BodyMesh({
       baked.push(g);
     });
 
-    // ---- Measure baked body for masculine pass ----
+    // ---- Masculine V-taper distortion ----
     const measureBox = new THREE.Box3();
     for (const g of baked) if (g.boundingBox) measureBox.union(g.boundingBox);
     const ms = new THREE.Vector3();
@@ -486,7 +304,7 @@ export function BodyMesh({
       masculinize(g, measureBox.min.y, measureBox.max.y, mc.x, ms.x / 2);
     }
 
-    // ---- Re-measure after distortion (shoulders are now wider) ----
+    // ---- Final bounds for the outer group transform ----
     const totalBox = new THREE.Box3();
     for (const g of baked) {
       g.computeBoundingBox();
@@ -496,68 +314,39 @@ export function BodyMesh({
     totalBox.getSize(size);
     const center = new THREE.Vector3();
     totalBox.getCenter(center);
-    const halfX = size.x / 2 || 1;
-    const halfZ = size.z / 2 || 1;
-    const yMin = totalBox.min.y;
     const ySize = size.y || 1;
 
     const out = new THREE.Group();
-    type ColorLayer = { indices: Int8Array; color: THREE.BufferAttribute };
-    const perMesh: ColorLayer[] = [];
+    const materials: THREE.ShaderMaterial[] = [];
     const cyan = new THREE.Color(baseColor);
 
-    const classifyAttr = (attr: THREE.BufferAttribute): ColorLayer => {
-      const count = attr.count;
-      const indices = new Int8Array(count);
-      const colors = new Float32Array(count * 3);
-      for (let i = 0; i < count; i++) {
-        const x = attr.getX(i);
-        const y = attr.getY(i);
-        const z = attr.getZ(i);
-        const nx = (x - center.x) / halfX;
-        const ny = (y - yMin) / ySize;
-        const nz = (z - center.z) / halfZ;
-        indices[i] = classifyVertex(nx, ny, nz);
-        colors[i * 3] = cyan.r;
-        colors[i * 3 + 1] = cyan.g;
-        colors[i * 3 + 2] = cyan.b;
-      }
-      const colorAttr = new THREE.BufferAttribute(colors, 3);
-      return { indices, color: colorAttr };
-    };
-
     for (const geom of baked) {
-      // --- Skin shell: solid holographic fill (fresnel + soft core) ---
-      const posAttr = geom.getAttribute("position") as THREE.BufferAttribute;
-      const skinLayer = classifyAttr(posAttr);
-      geom.setAttribute("color", skinLayer.color);
-
+      // --- Skin shell: holographic fill + analytical muscle lines ---
       const skinMat = new THREE.ShaderMaterial({
+        uniforms: {
+          uBaseColor: { value: cyan.clone() },
+          uTime: { value: 0 },
+        },
         vertexShader: SKIN_VERT,
         fragmentShader: SKIN_FRAG,
-        vertexColors: true,
         transparent: true,
         depthWrite: false,
         toneMapped: false,
-        blending: THREE.AdditiveBlending,
+        blending: THREE.NormalBlending,
         side: THREE.DoubleSide,
       });
+      materials.push(skinMat);
       const skinMesh = new THREE.Mesh(geom, skinMat);
       skinMesh.renderOrder = 0;
       skinMesh.frustumCulled = false;
       out.add(skinMesh);
-      perMesh.push(skinLayer);
 
-      // --- Layer A: full triangulated wireframe (every face edge) ---
+      // --- Layer A: full triangulated wireframe (very subtle texture) ---
       const wireGeom = new THREE.WireframeGeometry(geom);
-      const wireLayer = classifyAttr(
-        wireGeom.getAttribute("position") as THREE.BufferAttribute,
-      );
-      wireGeom.setAttribute("color", wireLayer.color);
       const wireMat = new THREE.LineBasicMaterial({
-        vertexColors: true,
+        color: cyan,
         transparent: true,
-        opacity: 0.32,
+        opacity: 0.14,
         depthWrite: false,
         toneMapped: false,
         blending: THREE.AdditiveBlending,
@@ -566,18 +355,13 @@ export function BodyMesh({
       wireLines.renderOrder = 1;
       wireLines.frustumCulled = false;
       out.add(wireLines);
-      perMesh.push(wireLayer);
 
-      // --- Layer B: silhouette + sharp creases (bright accent over the mesh) ---
-      const edgesGeom = new THREE.EdgesGeometry(geom, 28);
-      const edgeLayer = classifyAttr(
-        edgesGeom.getAttribute("position") as THREE.BufferAttribute,
-      );
-      edgesGeom.setAttribute("color", edgeLayer.color);
+      // --- Layer B: silhouette + sharp creases (bright accent) ---
+      const edgesGeom = new THREE.EdgesGeometry(geom, 24);
       const lineMat = new THREE.LineBasicMaterial({
-        vertexColors: true,
+        color: cyan,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.70,
         depthWrite: false,
         toneMapped: false,
         blending: THREE.AdditiveBlending,
@@ -586,111 +370,28 @@ export function BodyMesh({
       lines.renderOrder = 2;
       lines.frustumCulled = false;
       out.add(lines);
-      perMesh.push(edgeLayer);
-    }
-
-    // ---- Muscle definition outlines (pec ovals, ab 6-pack, biceps, etc) ----
-    const outlines = buildMuscleOutlines();
-    const segPositions: number[] = [];
-    const segGroups: number[] = [];
-    for (const outline of outlines) {
-      const groupIdx = GROUP_INDEX[outline.group];
-      const startCount = segPositions.length / 3;
-      pathToSegmentPositions(outline.points, segPositions);
-      const endCount = segPositions.length / 3;
-      for (let i = startCount; i < endCount; i++) segGroups.push(groupIdx);
-    }
-    if (segPositions.length > 0) {
-      const outlineGeom = new THREE.BufferGeometry();
-      outlineGeom.setAttribute(
-        "position",
-        new THREE.BufferAttribute(new Float32Array(segPositions), 3),
-      );
-      const outlineCount = segPositions.length / 3;
-      const outlineColors = new Float32Array(outlineCount * 3);
-      const outlineIndices = new Int8Array(outlineCount);
-      for (let i = 0; i < outlineCount; i++) {
-        outlineIndices[i] = segGroups[i];
-        outlineColors[i * 3] = cyan.r;
-        outlineColors[i * 3 + 1] = cyan.g;
-        outlineColors[i * 3 + 2] = cyan.b;
-      }
-      const outlineColorAttr = new THREE.BufferAttribute(outlineColors, 3);
-      outlineGeom.setAttribute("color", outlineColorAttr);
-
-      const outlineMat = new THREE.LineBasicMaterial({
-        vertexColors: true,
-        transparent: true,
-        opacity: 1.0,
-        depthWrite: false,
-        toneMapped: false,
-        blending: THREE.AdditiveBlending,
-      });
-      const outlineLines = new THREE.LineSegments(outlineGeom, outlineMat);
-      outlineLines.renderOrder = 3;
-      outlineLines.frustumCulled = false;
-      out.add(outlineLines);
-
-      perMesh.push({ indices: outlineIndices, color: outlineColorAttr });
     }
 
     const s = targetHeight / ySize;
     return {
       group: out,
-      perMesh,
       scale: s,
-      offset: new THREE.Vector3(-center.x * s, floorY - yMin * s, -center.z * s),
+      offset: new THREE.Vector3(
+        -center.x * s,
+        floorY - totalBox.min.y * s,
+        -center.z * s,
+      ),
+      materials,
     };
   }, [gltf, targetHeight, floorY, baseColor]);
 
-  // ---- Repaint vertex colors when state / hover / select changes ----
-  useEffect(() => {
-    if (!perMesh.length) return;
-    const groupColors = MUSCLE_GROUPS.map(
-      (g) => new THREE.Color(tirednessColor(muscleStates[g]?.hoursSince ?? null)),
-    );
-    const neutralColor = new THREE.Color(baseColor);
-    const hoverIdx = hoveredGroup ? GROUP_INDEX[hoveredGroup] : -2;
-    const selectIdx = selectedGroup ? GROUP_INDEX[selectedGroup] : -2;
-    const tmp = new THREE.Color();
-    const white = new THREE.Color("#ffffff");
-
-    const apply = (
-      indices: Int8Array,
-      attr: THREE.BufferAttribute,
-    ) => {
-      const colors = attr.array as Float32Array;
-      for (let i = 0; i < indices.length; i++) {
-        const g = indices[i];
-        let r: number, gg: number, b: number;
-        if (g === NEUTRAL) {
-          r = neutralColor.r;
-          gg = neutralColor.g;
-          b = neutralColor.b;
-        } else {
-          tmp.copy(groupColors[g]);
-          if (g === selectIdx) tmp.lerp(white, 0.45);
-          else if (g === hoverIdx) tmp.multiplyScalar(1.55);
-          r = tmp.r;
-          gg = tmp.g;
-          b = tmp.b;
-        }
-        colors[i * 3] = r;
-        colors[i * 3 + 1] = gg;
-        colors[i * 3 + 2] = b;
-      }
-      attr.needsUpdate = true;
-    };
-
-    // React 19's immutability rule treats values returned from useMemo as
-    // immutable. We deliberately mutate the BufferAttribute's typed array +
-    // flip needsUpdate — that's how three.js streams vertex-color changes to
-    // the GPU. Disable the rule for this targeted mutation.
-    for (const m of perMesh) {
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    for (const m of materials) {
       // eslint-disable-next-line react-hooks/immutability
-      apply(m.indices, m.color);
+      m.uniforms.uTime.value = t;
     }
-  }, [perMesh, muscleStates, hoveredGroup, selectedGroup, baseColor]);
+  });
 
   if (!group) return null;
 
