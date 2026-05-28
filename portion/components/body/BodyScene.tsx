@@ -272,11 +272,11 @@ export default function BodyScene({ muscleStates, selection, onSelect, mode }: P
 
       <EffectComposer multisampling={0} enableNormalPass={false}>
         <Bloom
-          intensity={mode === "preview" ? 0.65 : 1.0}
-          luminanceThreshold={0.45}
-          luminanceSmoothing={0.5}
+          intensity={mode === "preview" ? 0.18 : 0.28}
+          luminanceThreshold={0.7}
+          luminanceSmoothing={0.4}
           mipmapBlur
-          radius={0.55}
+          radius={0.4}
         />
         <Vignette
           offset={0.25}
