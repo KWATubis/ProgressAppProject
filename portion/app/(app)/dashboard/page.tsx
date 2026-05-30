@@ -7,6 +7,7 @@ import { DashboardPillarCard, type PillarGoal } from "@/components/dashboard/Das
 import { TodayTaskList, type TodayTask } from "@/components/dashboard/TodayTaskList";
 import { QuickStats } from "@/components/dashboard/QuickStats";
 import { CompoundingWeekCard } from "@/components/dashboard/CompoundingWeekCard";
+import { ShareProgressButton } from "@/components/dashboard/ShareProgressButton";
 import { withDerivedCurrent } from "@/lib/goalMetrics.server";
 import { computeWeeklySummary } from "@/lib/dashboard/weekly-summary";
 
@@ -91,17 +92,20 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          {greetingName ? `Good to see you, ${greetingName}.` : "Dashboard"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {today.toLocaleDateString(undefined, {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {greetingName ? `Good to see you, ${greetingName}.` : "Dashboard"}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {today.toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+        </div>
+        <ShareProgressButton />
       </div>
 
       <CompoundingWeekCard summary={weeklySummary} />
