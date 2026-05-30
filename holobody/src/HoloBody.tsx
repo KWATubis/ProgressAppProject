@@ -6,7 +6,17 @@ import { HolographicMaterial } from './HolographicMaterial'
 
 const HIDE_PATTERNS = /teeth|gums|tongue|innereye/i
 
-const ARM_DOWN_ANGLE   = 0.55  // ~31° drop at full arm tip
+// Arm posing. The imported figure is a T-pose; a single rigid drop reads as a
+// stiff scarecrow, so we settle the arms in two segments — the whole arm drops
+// off the shoulder (with a slight forward swing so it leaves the dead-flat
+// coronal plane), then everything past the elbow adds a soft forward flex — and
+// shave a little thickness off the limb so it isn't chunky.
+const SHOULDER_DROP    = 0.95  // rad, whole-arm drop from the T-pose horizontal (~54°)
+const ELBOW_BEND       = 0.34  // rad, extra forearm flex (swings the hand forward)
+const ELBOW_FRAC       = 0.52  // along-arm fraction (shoulder→fingertip) where the forearm begins
+const ELBOW_BLEND      = 0.14  // smooth ramp width around the elbow
+const ARM_FORWARD      = 0.12  // rad, slight forward swing of the whole arm
+const ARM_SLIM         = 0.86  // arm thickness scale toward its centerline (1 = unchanged)
 const SHOULDER_FRAC    = 0.11  // shoulder pivot X as fraction of T-pose half-width
 const ARM_BLEND_FRAC   = 0.06  // smooth blend width around shoulder
 
@@ -24,7 +34,7 @@ function smoothstep(edge0: number, edge1: number, x: number) {
   return t * t * (3 - 2 * t)
 }
 
-function bringArmsDown(meshes: THREE.Mesh[]) {
+function poseArms(meshes: THREE.Mesh[]) {
   if (meshes.length === 0) return
   const box = new THREE.Box3()
   for (const m of meshes) box.expandByObject(m)
@@ -36,6 +46,18 @@ function bringArmsDown(meshes: THREE.Mesh[]) {
   const shoulderY    = box.min.y + size.y * 0.82
   const shoulderEdge = size.x * SHOULDER_FRAC
   const blendBand    = size.x * ARM_BLEND_FRAC
+  const reach        = Math.max(size.x * 0.5 - shoulderEdge, 1e-4) // shoulder → fingertip span
+
+  // Scratch objects reused across every vertex (no per-vertex allocation).
+  const v       = new THREE.Vector3()
+  const elbow   = new THREE.Vector3()
+  const qDrop   = new THREE.Quaternion()
+  const qFwd    = new THREE.Quaternion()
+  const qShould = new THREE.Quaternion()
+  const qElbow  = new THREE.Quaternion()
+  const X_AXIS  = new THREE.Vector3(1, 0, 0)
+  const Y_AXIS  = new THREE.Vector3(0, 1, 0)
+  const Z_AXIS  = new THREE.Vector3(0, 0, 1)
 
   for (const mesh of meshes) {
     const geo = mesh.geometry
@@ -44,18 +66,40 @@ function bringArmsDown(meshes: THREE.Mesh[]) {
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i)
       const y = pos.getY(i)
+      const z = pos.getZ(i)
       const offX = Math.abs(x - center.x)
       const w = smoothstep(shoulderEdge, shoulderEdge + blendBand, offX)
       if (w <= 0) continue
       const dir = x > center.x ? 1 : -1
-      const angle = dir * ARM_DOWN_ANGLE * w
+
+      // 1. Slim the limb: pull thickness (vertical + front/back) toward the arm's
+      //    centerline, ramped in by w so the shoulder/deltoid stays full.
+      const slim = 1 - (1 - ARM_SLIM) * w
+      v.set(x, shoulderY + (y - shoulderY) * slim, center.z + (z - center.z) * slim)
+
+      // 2. Upper arm: drop the whole arm off the shoulder (rotate about Z), plus a
+      //    small forward swing about Y so it leaves the dead-flat coronal plane.
       const pivotX = center.x + dir * shoulderEdge
-      const dx = x - pivotX
-      const dy = y - shoulderY
-      const ca = Math.cos(angle)
-      const sa = Math.sin(angle)
-      pos.setX(i, pivotX + dx * ca + dy * sa)
-      pos.setY(i, shoulderY + (-dx * sa + dy * ca))
+      qDrop.setFromAxisAngle(Z_AXIS, -dir * SHOULDER_DROP * w)
+      qFwd.setFromAxisAngle(Y_AXIS, -dir * ARM_FORWARD * w)
+      qShould.multiplyQuaternions(qFwd, qDrop)
+
+      v.set(v.x - pivotX, v.y - shoulderY, v.z - center.z).applyQuaternion(qShould)
+      v.set(v.x + pivotX, v.y + shoulderY, v.z + center.z)
+
+      // 3. Forearm: soft elbow flex forward for everything past the elbow. The
+      //    elbow joint is the point along the T-pose arm at ELBOW_FRAC, carried
+      //    through the same shoulder rotation, so the forearm pivots about it.
+      const t = (offX - shoulderEdge) / reach
+      const flex = smoothstep(ELBOW_FRAC, ELBOW_FRAC + ELBOW_BLEND, t) * ELBOW_BEND * w
+      if (flex > 1e-5) {
+        elbow.set(dir * ELBOW_FRAC * reach, 0, 0).applyQuaternion(qShould)
+        elbow.set(elbow.x + pivotX, elbow.y + shoulderY, elbow.z + center.z)
+        qElbow.setFromAxisAngle(X_AXIS, -flex)
+        v.sub(elbow).applyQuaternion(qElbow).add(elbow)
+      }
+
+      pos.setXYZ(i, v.x, v.y, v.z)
     }
     pos.needsUpdate = true
     geo.computeVertexNormals()
@@ -340,7 +384,7 @@ export default function HoloBody({ url = '/models/standard-male-figure.dae' }: {
       meshes.push(m)
     })
 
-    bringArmsDown(meshes)
+    poseArms(meshes)
     // The body is the mesh with the most vertices; carve its interior mouth /
     // throat cavity out before the muscle pass so it stops glowing through.
     let bodyMesh = meshes[0]
