@@ -11,6 +11,8 @@ import { GarminSyncButton } from "@/components/health/GarminSyncButton";
 import { BodyExplorer } from "@/components/body/BodyExplorer";
 import { MUSCLE_GROUPS, type MuscleGroup, type MuscleState } from "@/lib/body/muscle-state";
 import { getMuscleStates } from "@/lib/body/muscle-state.server";
+import { StrengthPRs } from "@/components/health/StrengthPRs";
+import { loadStrengthPRs } from "@/lib/strength.server";
 
 export default async function HealthOverviewPage() {
   const supabase = await createClient();
@@ -23,7 +25,7 @@ export default async function HealthOverviewPage() {
   const thirtyDaysAgo = addDays(today, -30);
   const sevenDaysAgo = addDays(today, -7);
 
-  const [weightMetrics, dietLogs, dietToday, wellnessToday, wellnessTrend, muscleStateList] =
+  const [weightMetrics, dietLogs, dietToday, wellnessToday, wellnessTrend, muscleStateList, strengthPRs] =
     await Promise.all([
       prisma.bodyMetric.findMany({
         where: {
@@ -47,6 +49,7 @@ export default async function HealthOverviewPage() {
         orderBy: { date: "asc" },
       }),
       getMuscleStates(user.id),
+      loadStrengthPRs(user.id, 5),
     ]);
 
   const muscleStates = MUSCLE_GROUPS.reduce(
@@ -137,6 +140,16 @@ export default async function HealthOverviewPage() {
           wellnessTrend={wellnessTrendPoints}
         />
       </section>
+
+      {strengthPRs.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-base font-semibold">Personal records</h2>
+            <span className="text-xs text-muted-foreground">Estimated 1RM · Epley</span>
+          </div>
+          <StrengthPRs prs={strengthPRs} />
+        </section>
+      )}
 
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">

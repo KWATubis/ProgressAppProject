@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { ExerciseSetRow, type ExerciseWithSets } from "@/components/health/ExerciseSetRow";
 import { DeleteSessionButton } from "@/components/health/DeleteSessionButton";
+import { detectSessionPRs } from "@/lib/strength.server";
 
 export default async function WorkoutDetailPage({
   params,
@@ -62,6 +63,17 @@ export default async function WorkoutDetailPage({
   }
 
   const exercises = Array.from(exerciseMap.values());
+
+  // Estimated 1RM + PR detection per exercise in this session.
+  const prMap = await detectSessionPRs(user.id, session.id);
+  for (const ex of exercises) {
+    const pr = prMap.get(ex.id);
+    if (pr) {
+      ex.e1RM = pr.e1RM;
+      ex.isPR = pr.isPR;
+      ex.prevBest = pr.prevBest;
+    }
+  }
 
   return (
     <div className="space-y-5">
