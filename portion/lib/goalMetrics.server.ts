@@ -220,6 +220,73 @@ export async function computeMetricValue(
   }
 }
 
+export type CustomMetricView = {
+  id: string;
+  title: string;
+  unit: string;
+  aggregation: "LATEST" | "MAX" | "SUM" | "COUNT" | "AVG";
+  direction: "HIGHER_BETTER" | "LOWER_BETTER";
+  current: number | null;
+  entries: { id: string; date: string; value: number }[];
+};
+
+/** Reduce a metric's entries to its single headline value per aggregation
+ *  mode. Computed in-memory from already-loaded entries so we don't re-query
+ *  per metric. `entries` may be in any order. */
+function aggregateEntries(
+  aggregation: CustomMetricView["aggregation"],
+  values: number[],
+): number | null {
+  if (aggregation === "COUNT") return values.length;
+  if (values.length === 0) return null;
+  switch (aggregation) {
+    case "MAX":
+      return Math.max(...values);
+    case "SUM":
+      return values.reduce((s, v) => s + v, 0);
+    case "AVG":
+      return values.reduce((s, v) => s + v, 0) / values.length;
+    case "LATEST":
+    default:
+      return values[values.length - 1];
+  }
+}
+
+/** Load every custom metric for an activity with its entry time-series and a
+ *  derived headline value — feeds the activity-page CustomMetricsPanel. */
+export async function loadActivityCustomMetrics(
+  profileId: string,
+  activityTypeId: string,
+): Promise<CustomMetricView[]> {
+  const metrics = await prisma.customMetric.findMany({
+    where: { profileId, activityTypeId },
+    orderBy: { createdAt: "desc" },
+    include: {
+      entries: {
+        orderBy: { date: "asc" },
+        select: { id: true, date: true, value: true },
+      },
+    },
+  });
+
+  return metrics.map((m) => {
+    const entries = m.entries.map((e) => ({
+      id: e.id,
+      date: e.date.toISOString().slice(0, 10),
+      value: e.value,
+    }));
+    return {
+      id: m.id,
+      title: m.title,
+      unit: m.unit,
+      aggregation: m.aggregation,
+      direction: m.direction,
+      current: aggregateEntries(m.aggregation, entries.map((e) => e.value)),
+      entries,
+    };
+  });
+}
+
 /** Resolve fresh currentValue for an array of goals — leaves goals without
  *  metricKey/customMetricId untouched. Returns a new array of the same shape. */
 export async function withDerivedCurrent<

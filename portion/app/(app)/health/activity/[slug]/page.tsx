@@ -10,8 +10,9 @@ import { CardioSessionCard, type CardioSessionView } from "@/components/health/C
 import { DeleteActivityButton } from "@/components/health/DeleteActivityButton";
 import { EditActivityButton } from "@/components/activities/EditActivityButton";
 import { ActivityGoalCard, type ActivityGoalData } from "@/components/activities/ActivityGoalCard";
+import { CustomMetricsPanel } from "@/components/metrics/CustomMetricsPanel";
 import { AddTaskDialog } from "@/components/tasks/AddTaskDialog";
-import { withDerivedCurrent } from "@/lib/goalMetrics.server";
+import { withDerivedCurrent, loadActivityCustomMetrics } from "@/lib/goalMetrics.server";
 import { formatISODate } from "@/lib/utils/dates";
 import type { ActivityKind } from "@/lib/goalMetrics";
 
@@ -75,13 +76,8 @@ export default async function ActivityPage({
       }
     : null;
 
-  const customMetrics = (
-    await prisma.customMetric.findMany({
-      where: { profileId: user.id, activityTypeId: activity.id },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, title: true, unit: true, aggregation: true, direction: true },
-    })
-  ).map((m) => ({
+  const customMetricViews = await loadActivityCustomMetrics(user.id, activity.id);
+  const customMetrics = customMetricViews.map((m) => ({
     id: m.id,
     title: m.title,
     unit: m.unit,
@@ -98,6 +94,14 @@ export default async function ActivityPage({
       kind={activity.kind as ActivityKind}
       color={activity.color}
       customMetrics={customMetrics}
+    />
+  );
+
+  const metricsPanel = (
+    <CustomMetricsPanel
+      activityTypeId={activity.id}
+      metrics={customMetricViews}
+      color={activity.color}
     />
   );
 
@@ -155,6 +159,7 @@ export default async function ActivityPage({
       <div className="space-y-6">
         {header}
         {goalCard}
+        {metricsPanel}
 
         {/* Plan overview */}
         {activity.workoutPlan && (
@@ -256,6 +261,7 @@ export default async function ActivityPage({
       <div className="space-y-6">
         {header}
         {goalCard}
+        {metricsPanel}
 
         {sessions.length > 0 && (
           <div className="flex gap-6 text-sm">
@@ -339,6 +345,7 @@ export default async function ActivityPage({
     <div className="space-y-6">
       {header}
       {goalCard}
+      {metricsPanel}
 
       {totalSessions > 0 && (
         <div className="flex gap-6 text-sm">
