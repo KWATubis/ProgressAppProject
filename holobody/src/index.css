@@ -1,0 +1,69 @@
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #02060a;
+  color: #cfeeff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+}
+
+canvas { display: block; }
+
+.hud {
+  position: fixed;
+  top: 18px;
+  left: 22px;
+  z-index: 10;
+  pointer-events: none;
+  letter-spacing: 0.18em;
+}
+
+.hud .title {
+  font-size: 14px;
+  color: #5be3ff;
+  text-shadow: 0 0 12px rgba(91, 227, 255, 0.55);
+}
+
+.hud .sub {
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.55;
+  letter-spacing: 0.08em;
+}
+
+.controls {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+}
+
+.controls button {
+  background: rgba(91, 227, 255, 0.06);
+  color: #5be3ff;
+  border: 1px solid rgba(91, 227, 255, 0.35);
+  padding: 8px 16px;
+  font: 11px ui-monospace, monospace;
+  letter-spacing: 0.2em;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.controls button:hover {
+  background: rgba(91, 227, 255, 0.15);
+  border-color: rgba(91, 227, 255, 0.8);
+}
+
+.controls button.on {
+  background: rgba(91, 227, 255, 0.25);
+  border-color: #5be3ff;
+  color: #e8faff;
+  box-shadow: 0 0 16px rgba(91, 227, 255, 0.4);
+}
