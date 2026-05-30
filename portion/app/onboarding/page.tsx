@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { OnboardingWizard } from "./OnboardingWizard";
-import { defaultPlan } from "./defaults";
+import { defaultPlan, ARCHETYPES } from "./defaults";
 
 export default async function OnboardingPage({
   searchParams,
@@ -41,6 +41,7 @@ export default async function OnboardingPage({
   return (
     <OnboardingWizard
       defaults={defaultPlan}
+      archetypes={ARCHETYPES}
       userName={profile?.name ?? "Jędrek"}
       userEmail={profile?.email ?? user?.email ?? "preview@portion.app"}
     />

@@ -10,54 +10,73 @@ import {
   Check,
   Dumbbell,
   Plus,
+  Sparkles,
   TrendingUp,
   X,
 } from "lucide-react";
 import { savePlan } from "./actions";
+import { ArchetypePicker } from "./ArchetypePicker";
+import type { Archetype, ArchetypeId } from "./defaults";
 import type { Frequency, PillarPlan, WizardGoal, WizardHabit, WizardPlan } from "./types";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const STORAGE_KEY = "portion_onboarding_v1";
+const STORAGE_KEY = "portion_onboarding_v2";
 
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"]; // 0=Sun
 
 export function OnboardingWizard({
   defaults,
+  archetypes,
   userName,
 }: {
   defaults: WizardPlan;
+  archetypes: Archetype[];
   userName: string | null;
   userEmail: string;
 }) {
   const [step, setStep] = useState(0);
   const [plan, setPlan] = useState<WizardPlan>(defaults);
+  const [archetypeId, setArchetypeId] = useState<ArchetypeId | null>(null);
   const [pending, startTransition] = useTransition();
 
   // Restore from localStorage (if user refreshed mid-wizard)
   useEffect(() => {
     const raw = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-    if (raw) {
-      try {
-        setPlan(JSON.parse(raw));
-      } catch {
-        // ignore corrupt state
-      }
+    if (!raw) return;
+    try {
+      const saved = JSON.parse(raw) as { archetypeId?: ArchetypeId | null; step?: number; plan?: WizardPlan };
+      if (saved.plan) setPlan(saved.plan);
+      if (saved.archetypeId) setArchetypeId(saved.archetypeId);
+      if (typeof saved.step === "number") setStep(Math.min(Math.max(saved.step, 0), 3));
+    } catch {
+      // ignore corrupt state
     }
   }, []);
 
   // Mirror to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
-  }, [plan]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ archetypeId, step, plan }));
+  }, [archetypeId, step, plan]);
 
   const updatePillar = (which: "health" | "money", patch: PillarPlan) => {
     setPlan((p) => ({ ...p, [which]: patch }));
   };
 
+  function selectArchetype(id: ArchetypeId) {
+    // Only reseed the plan when switching to a *different* archetype — clicking
+    // the already-selected one (e.g. after navigating Back) preserves edits.
+    if (id !== archetypeId) {
+      const chosen = archetypes.find((a) => a.id === id);
+      if (chosen) setPlan(chosen.plan);
+      setArchetypeId(id);
+    }
+    setStep(1);
+  }
+
   function next() {
-    setStep((s) => Math.min(s + 1, 2));
+    setStep((s) => Math.min(s + 1, 3));
   }
   function back() {
     setStep((s) => Math.max(s - 1, 0));
@@ -76,6 +95,7 @@ export function OnboardingWizard({
   }
 
   const steps = [
+    { label: "You", icon: <Sparkles className="h-4 w-4" /> },
     { label: "Health", icon: <Dumbbell className="h-4 w-4" /> },
     { label: "Money", icon: <TrendingUp className="h-4 w-4" /> },
     { label: "Confirm", icon: <Check className="h-4 w-4" /> },
@@ -95,7 +115,7 @@ export function OnboardingWizard({
           <span className="text-lg font-semibold tracking-tight">Portion</span>
         </Link>
         <div className="text-xs text-white/40">
-          {userName ? `${userName} · ` : ""}step {step + 1} of 3
+          {userName ? `${userName} · ` : ""}step {step + 1} of 4
         </div>
       </header>
 
@@ -142,6 +162,16 @@ export function OnboardingWizard({
 
         <AnimatePresence mode="wait">
           {step === 0 && (
+            <StepWrapper key="archetype">
+              <ArchetypePicker
+                archetypes={archetypes}
+                selectedId={archetypeId}
+                onSelect={selectArchetype}
+                userName={userName}
+              />
+            </StepWrapper>
+          )}
+          {step === 1 && (
             <StepWrapper key="health">
               <PillarStep
                 pillar="health"
@@ -154,7 +184,7 @@ export function OnboardingWizard({
               />
             </StepWrapper>
           )}
-          {step === 1 && (
+          {step === 2 && (
             <StepWrapper key="money">
               <PillarStep
                 pillar="money"
@@ -167,7 +197,7 @@ export function OnboardingWizard({
               />
             </StepWrapper>
           )}
-          {step === 2 && (
+          {step === 3 && (
             <StepWrapper key="confirm">
               <ConfirmStep plan={plan} />
             </StepWrapper>
@@ -184,11 +214,12 @@ export function OnboardingWizard({
             <ArrowLeft className="h-4 w-4" />
             Back
           </button>
-          {step < 2 ? (
+          {step < 3 ? (
             <button
               type="button"
               onClick={next}
-              className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-black transition hover:scale-[1.02] active:scale-[0.98]"
+              disabled={step === 0 && !archetypeId}
+              className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-black transition hover:scale-[1.02] active:scale-[0.98] disabled:opacity-30 disabled:hover:scale-100"
             >
               Continue
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
