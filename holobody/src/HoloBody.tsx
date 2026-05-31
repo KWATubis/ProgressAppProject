@@ -11,17 +11,21 @@ const HIDE_PATTERNS = /teeth|gums|tongue|innereye/i
 // off the shoulder (with a slight forward swing so it leaves the dead-flat
 // coronal plane), then everything past the elbow adds a soft forward flex — and
 // shave a little thickness off the limb so it isn't chunky.
-const SHOULDER_DROP    = 0.88  // rad, whole-arm drop from the A-pose toward the side; a touch shy
-                               // of clamped-to-the-body so the upper arm clears the lat (armpit gap)
-const ELBOW_BEND       = 0.46  // rad, forearm flex — bends the elbow so the hands carry forward off
-                               // the thighs instead of lying flat against them like a mannequin
+const SHOULDER_DROP    = 0.58  // rad, whole-arm drop from the A-pose toward the side. Kept well shy
+                               // of vertical so the arms stay abducted ~25° off the torso — the
+                               // upper arm/biceps clears the lat and the hands rest out from the hips.
+const ELBOW_BEND       = 0.0   // rad, forearm flex — 0 = straight arms, no elbow break
 const ELBOW_FRAC       = 0.50  // along-arm fraction (shoulder→fingertip) where the forearm begins
 const ELBOW_BLEND      = 0.16  // smooth ramp width around the elbow
-const ARM_FORWARD      = 0.20  // rad, forward swing of the whole arm — lifts the hands out of the
-                               // dead coronal plane so they sit slightly in front of the hips
+const ARM_FORWARD      = 0.10  // rad, slight forward swing of the whole arm so the straight arms
+                               // don't sit dead-flat in the coronal plane
 const ARM_SLIM         = 0.86  // arm thickness scale toward its centerline (1 = unchanged)
 const SHOULDER_FRAC    = 0.11  // shoulder pivot X as fraction of T-pose half-width
 const ARM_BLEND_FRAC   = 0.06  // smooth blend width around shoulder
+
+// Extra muscle-inflation multiplier on the thighs (quads/hamstrings) over the
+// rest of the body, so their bellies + separating valleys read as defined.
+const LEG_EMPHASIS     = 1.6
 
 // Wireframe-overlay height fade (true world space: feet ~0, head ~2.0). Kills
 // the sole wireframe that webs a bright line between the feet, and dims the
@@ -226,7 +230,7 @@ function trimInteriorHeadCavities(
 //      glowing border lines.
 // Both run in object space so the result is stable and sharp at any camera
 // distance, unlike a screen-space normal-derivative crease.
-function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
+function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.013) {
   if (geo.userData.musclesProcessed) return
   const posAttr = geo.attributes.position
   const N = posAttr.count
@@ -343,9 +347,15 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
       const headMask = 1 - THREE.MathUtils.smoothstep(yN, 0.80, 0.92) // fade out over head/neck
       const footMask = THREE.MathUtils.smoothstep(yN, 0.02, 0.10)      // fade out at the feet
       const convexN = Math.min(1, Math.max(0, -sm[i] / scale))         // how much of a bulge
+      // Thigh emphasis: push the quad/hamstring bellies harder than the rest of
+      // the body so the muscle separations (rectus femoris vs. vastus, the
+      // hamstring split) deepen enough to read under the form shading. The band
+      // ramps in above the knee (~0.27·h) and out at the hip (~0.50·h).
+      const thighK = THREE.MathUtils.smoothstep(yN, 0.25, 0.31) * (1 - THREE.MathUtils.smoothstep(yN, 0.46, 0.52))
+      const legBoost = 1 + LEG_EMPHASIS * thighK
       // formMask keeps the inflation on broad muscle forms but spares fine
       // detail, so thin fingers and facial features don't balloon.
-      disp[i] = inflate * height * headMask * footMask * convexN * formMask[i]
+      disp[i] = inflate * height * headMask * footMask * convexN * formMask[i] * legBoost
     }
     // Smooth the displacement field so the added mass reads as smooth volume.
     // More passes round the bellies off so muscles don't peak into points.
@@ -425,10 +435,13 @@ export default function HoloBody({ url = '/models/standard-male-figure.dae' }: {
       lightDirection: [0.25, 1.0, 0.4],
       surfaceBrightness: 0.46,  // dimmer fill — smaller overall glow
       rimStrength: 1.0,         // smaller silhouette glow
-      creaseStrength: 0.0,      // seam/muscle glow off entirely — no bright spots
-      creaseThreshold: 0.42,    // lower cutoff so shallower ab-grid valleys light up
+      creaseStrength: 0.7,      // seam/muscle glow — lights the muscle-separation valleys
+                                // (quad sweep, hamstring split, ab grid) so the forms read
+      creaseThreshold: 0.46,    // cutoff so only the real valleys (not noise) light up
       creaseWidth: 0.3,         // line softness band above the threshold
-      creaseSharpness: 1.5,     // crisp, well-defined lines
+      creaseSharpness: 1.6,     // crisp, well-defined lines
+      creaseRolloffLo: 0.74,    // start rolling the glow off earlier so the deepest pits
+      creaseRolloffHi: 0.93,    // (throat/clavicle hollow, groin) stop blooming into hotspots
       footFadeLo: 0.0,          // kill the bright sole rim that joins the feet
       footFadeHi: 0.12,
       headFadeLo: 1.64,         // calm the over-bright skull / face / eyes
