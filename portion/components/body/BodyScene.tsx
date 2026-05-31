@@ -7,7 +7,8 @@ import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
 import type { MuscleGroup, MuscleState } from "@/lib/body/muscle-state";
-import { Humanoid, type BodySelection } from "./Humanoid";
+import type { BodySelection } from "./Humanoid";
+import HoloBody from "./HoloBody";
 
 type Mode = "preview" | "idle" | "focused";
 
@@ -229,7 +230,7 @@ export default function BodyScene({ muscleStates, selection, onSelect, mode }: P
     <Canvas
       shadows
       dpr={[1, 2]}
-      camera={{ position: TARGETS.preview.pos.toArray(), fov: 32 }}
+      camera={{ position: TARGETS.preview.pos.toArray(), fov: 32, near: 0.3, far: 40 }}
       gl={{
         antialias: true,
         alpha: true,
@@ -247,11 +248,12 @@ export default function BodyScene({ muscleStates, selection, onSelect, mode }: P
       <pointLight position={[1.5, 2, -1.5]} intensity={0.2} color="#3a7dff" />
 
       <Suspense fallback={null}>
-        <Humanoid
+        <HoloBody
           muscleStates={muscleStates}
           selection={selection}
-          onSelect={mode === "preview" ? () => {} : onSelect}
+          onSelect={onSelect}
           autoRotate={mode !== "focused"}
+          interactive={mode !== "preview"}
         />
         {mode !== "preview" ? <GridFloor /> : null}
         {mode !== "preview" ? <AtmosphereParticles count={mode === "focused" ? 180 : 260} /> : null}

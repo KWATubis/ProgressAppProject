@@ -28,6 +28,9 @@ const ARM_BLEND_FRAC   = 0.06  // smooth blend width around shoulder
 // and shave a little off the whole thigh so it ends up a touch smaller, not larger.
 const LEG_DEFINE       = 0.026  // how hard the inter-head valleys are pulled in (× height)
 const LEG_SLIM         = 0.006  // uniform inward shave on the thighs (× height)
+const CALF_SLIM        = 0.011  // uniform inward shave on the calves (× height) — undoes the
+                                // muscle-belly inflation on the lower leg and trims a touch more
+                                // so the calves read a bit smaller / leaner.
 
 // Wireframe-overlay height fade (true world space: feet ~0, head ~2.0). Kills
 // the sole wireframe that webs a bright line between the feet, and dims the
@@ -361,6 +364,10 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
       // inward (negative) along the normal.
       d -= LEG_DEFINE * height * footMask * formMask[i] * concaveN * thighK
       d -= LEG_SLIM   * height * footMask * thighK
+      // Calf band (ramps in above the ankle ~0.10·h, out below the knee ~0.27·h).
+      // Shave the whole lower leg inward so the calves end up a bit smaller.
+      const calfK = THREE.MathUtils.smoothstep(yN, 0.10, 0.15) * (1 - THREE.MathUtils.smoothstep(yN, 0.24, 0.29))
+      d -= CALF_SLIM * height * footMask * calfK
       disp[i] = d
     }
     // Smooth the displacement field so the added mass reads as smooth volume.
