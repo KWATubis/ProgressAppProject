@@ -28,6 +28,7 @@ export type GoalView = {
   pillar: Pillar;
   title: string;
   description: string | null;
+  whyStatement: string | null;
   currentValue: number | null;
   targetValue: number | null;
   startValue: number | null;
@@ -324,6 +325,7 @@ function GoalEditorForm({
 
   const [title, setTitle] = useState(initial?.title ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
+  const [whyStatement, setWhyStatement] = useState(initial?.whyStatement ?? "");
   const [pillar, setPillar] = useState<Pillar>(initialPillar);
   const [selection, setSelection] = useState<string>(initialSelection);
   const [currentValue, setCurrentValue] = useState(
@@ -387,6 +389,7 @@ function GoalEditorForm({
         pillar,
         title: title.trim(),
         description: description.trim() || null,
+        whyStatement: whyStatement.trim() || null,
         currentValue: hasMetric ? null : parseNum(currentValue),
         targetValue: parseNum(targetValue),
         unit: unit.trim() || null,
@@ -490,9 +493,23 @@ function GoalEditorForm({
               id="goal-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Why does this goal matter?"
+              placeholder="A note about this goal."
               rows={2}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="goal-why">Your why (optional)</Label>
+            <Textarea
+              id="goal-why"
+              value={whyStatement}
+              onChange={(e) => setWhyStatement(e.target.value)}
+              placeholder="The real reason. We'll resurface this every Sunday so you don't lose the thread."
+              rows={2}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Surfaced on your check-in every Sunday.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

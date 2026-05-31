@@ -26,6 +26,7 @@ export default async function GoalsPage() {
     pillar: g.pillar,
     title: g.title,
     description: g.description,
+    whyStatement: g.whyStatement,
     currentValue: g.currentValue,
     targetValue: g.targetValue,
     startValue: g.startValue,

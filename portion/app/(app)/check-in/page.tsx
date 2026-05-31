@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate } from "@/lib/utils/dates";
 import { isTaskScheduledOn } from "@/lib/utils/tasks";
 import { DailyCheckInPage } from "@/components/checkin/DailyCheckInPage";
+import { WhyAnchorCallout, type WhyAnchor } from "@/components/checkin/WhyAnchorCallout";
+import { VoiceNoteRecorder } from "@/components/checkin/VoiceNoteRecorder";
 import type { TodayTask } from "@/components/dashboard/TodayTaskList";
 import type { Meal } from "@/components/checkin/DietLogForm";
 import type { MetricValues } from "@/components/checkin/BodyMetricForm";
@@ -17,6 +19,27 @@ export default async function CheckInPage() {
 
   const today = toUtcMidnight();
   const todayISO = formatISODate(today);
+  const isSunday = today.getUTCDay() === 0;
+
+  // Why-anchors only resurface on Sundays — skip the query the rest of the week.
+  const whyAnchors: WhyAnchor[] = isSunday
+    ? (
+        await prisma.goal.findMany({
+          where: {
+            profileId: user.id,
+            isActive: true,
+            whyStatement: { not: null },
+          },
+          orderBy: [{ pillar: "asc" }, { createdAt: "asc" }],
+          select: { id: true, title: true, whyStatement: true, pillar: true },
+        })
+      ).map((g) => ({
+        id: g.id,
+        title: g.title,
+        whyStatement: g.whyStatement!,
+        pillar: g.pillar,
+      }))
+    : [];
 
   const [tasks, logsToday, dietToday, metricToday, activityTypes] = await Promise.all([
     prisma.task.findMany({
@@ -75,12 +98,22 @@ export default async function CheckInPage() {
           {today.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
         </p>
       </div>
+      <WhyAnchorCallout anchors={whyAnchors} />
+      <VoiceNoteRecorder dateISO={todayISO} />
       <DailyCheckInPage
         dateISO={todayISO}
         tasks={todayTasks}
         meals={meals}
         metric={metric}
-        activityTypes={activityTypes as any}
+        activityTypes={
+          activityTypes as Array<{
+            id: string;
+            name: string;
+            slug: string;
+            icon: string | null;
+            kind: "STRENGTH" | "CARDIO" | "SPORT";
+          }>
+        }
       />
     </div>
   );

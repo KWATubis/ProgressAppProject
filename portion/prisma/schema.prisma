@@ -88,7 +88,22 @@ model Profile {
   activityTypes     ActivityType[]
   wellnessDays      WellnessDay[]
   customMetrics     CustomMetric[]
+  voiceNotes        DailyVoiceNote[]
   onboardingSession OnboardingSession?
+}
+
+model DailyVoiceNote {
+  id          String   @id @default(cuid())
+  profileId   String
+  profile     Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  date        DateTime
+  storagePath String
+  durationSec Int
+  transcript  String?
+  createdAt   DateTime @default(now())
+
+  @@unique([profileId, date])
+  @@index([profileId])
 }
 
 model OnboardingSession {
@@ -112,6 +127,7 @@ model Goal {
   pillar         Pillar
   title          String
   description    String?
+  whyStatement   String?
   targetDate     DateTime?
   targetValue    Float?
   currentValue   Float?
