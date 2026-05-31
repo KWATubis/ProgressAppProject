@@ -35,6 +35,8 @@ export interface HolographicMaterialParams {
   creaseSharpness?: number   // >1 tightens seams to thin crisp lines, <1 softens them
   creaseRolloffLo?: number   // crease value where the deepest-pit glow starts fading out
   creaseRolloffHi?: number   // crease value where the deepest-pit glow is fully gone
+  creaseLegLo?: number       // world-Y below which the seam glow is full (legs)
+  creaseLegHi?: number       // world-Y above which the seam glow is gone (clean torso)
   footFadeLo?: number        // world-Y where the foot glow fade starts (kills the sole line)
   footFadeHi?: number        // world-Y where glow returns to full above the feet
   headFadeLo?: number        // world-Y where the head glow damp starts
@@ -135,6 +137,8 @@ export class HolographicMaterial extends ShaderMaterial {
       uniform float creaseSharpness;
       uniform float creaseRolloffLo;
       uniform float creaseRolloffHi;
+      uniform float creaseLegLo;
+      uniform float creaseLegHi;
       uniform float footFadeLo;
       uniform float footFadeHi;
       uniform float headFadeLo;
@@ -215,8 +219,11 @@ export class HolographicMaterial extends ShaderMaterial {
         float footFade = smoothstep(footFadeLo, footFadeHi, vWorldY);
         float headK    = smoothstep(headFadeLo, headFadeHi, vWorldY);
         float headDamp = mix(1.0, headGlow, headK);
+        // Seam glow is for the legs only — full below the hip, gone above it — so the
+        // quad/hamstring separations read while the torso stays clean (no ab/pec lines).
+        float legMask  = 1.0 - smoothstep(creaseLegLo, creaseLegHi, vWorldY);
         rim        *= footFade * headDamp;
-        seamGlow   *= footFade * headDamp;
+        seamGlow   *= footFade * headDamp * legMask;
         shadedFill *= footFade * mix(1.0, headFill, headK);
 
         vec3 finalColor;
@@ -228,9 +235,10 @@ export class HolographicMaterial extends ShaderMaterial {
         finalColor += seamGlow;
 
         // ---- Alpha: translucent across the bellies so the grid and far side
-        // bleed through, snapping back to solid along the glowing seams.
+        // bleed through, snapping back to solid along the glowing seams (legs only,
+        // so the torso doesn't get faint opacity lines where the glow is masked off).
         float shadedAlpha = hologramOpacity * mix(1.0 - muscleEmphasis * 0.85, 1.0, sharpNdotL);
-        shadedAlpha = max(shadedAlpha, seam);
+        shadedAlpha = max(shadedAlpha, seam * legMask);
 
         gl_FragColor = vec4(finalColor, clamp(shadedAlpha, 0.0, 1.0));
       }
@@ -258,6 +266,8 @@ export class HolographicMaterial extends ShaderMaterial {
       creaseSharpness:    new Uniform(parameters.creaseSharpness ?? 1.4),
       creaseRolloffLo:    new Uniform(parameters.creaseRolloffLo ?? 0.82),
       creaseRolloffHi:    new Uniform(parameters.creaseRolloffHi ?? 0.98),
+      creaseLegLo:        new Uniform(parameters.creaseLegLo ?? 1.02),
+      creaseLegHi:        new Uniform(parameters.creaseLegHi ?? 1.20),
       footFadeLo:         new Uniform(parameters.footFadeLo ?? 0.0),
       footFadeHi:         new Uniform(parameters.footFadeHi ?? 0.1),
       headFadeLo:         new Uniform(parameters.headFadeLo ?? 1.64),

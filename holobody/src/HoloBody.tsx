@@ -23,9 +23,11 @@ const ARM_SLIM         = 0.86  // arm thickness scale toward its centerline (1 =
 const SHOULDER_FRAC    = 0.11  // shoulder pivot X as fraction of T-pose half-width
 const ARM_BLEND_FRAC   = 0.06  // smooth blend width around shoulder
 
-// Extra muscle-inflation multiplier on the thighs (quads/hamstrings) over the
-// rest of the body, so their bellies + separating valleys read as defined.
-const LEG_EMPHASIS     = 1.6
+// Thigh definition without added bulk. Rather than inflate the quads/hams bigger,
+// carve the valleys BETWEEN the muscle heads deeper (so each head reads separately)
+// and shave a little off the whole thigh so it ends up a touch smaller, not larger.
+const LEG_DEFINE       = 0.026  // how hard the inter-head valleys are pulled in (× height)
+const LEG_SLIM         = 0.006  // uniform inward shave on the thighs (× height)
 
 // Wireframe-overlay height fade (true world space: feet ~0, head ~2.0). Kills
 // the sole wireframe that webs a bright line between the feet, and dims the
@@ -230,7 +232,7 @@ function trimInteriorHeadCavities(
 //      glowing border lines.
 // Both run in object space so the result is stable and sharp at any camera
 // distance, unlike a screen-space normal-derivative crease.
-function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.013) {
+function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
   if (geo.userData.musclesProcessed) return
   const posAttr = geo.attributes.position
   const N = posAttr.count
@@ -346,16 +348,20 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.013) {
       const yN = (cy[i] - minY) / height
       const headMask = 1 - THREE.MathUtils.smoothstep(yN, 0.80, 0.92) // fade out over head/neck
       const footMask = THREE.MathUtils.smoothstep(yN, 0.02, 0.10)      // fade out at the feet
-      const convexN = Math.min(1, Math.max(0, -sm[i] / scale))         // how much of a bulge
-      // Thigh emphasis: push the quad/hamstring bellies harder than the rest of
-      // the body so the muscle separations (rectus femoris vs. vastus, the
-      // hamstring split) deepen enough to read under the form shading. The band
-      // ramps in above the knee (~0.27·h) and out at the hip (~0.50·h).
-      const thighK = THREE.MathUtils.smoothstep(yN, 0.25, 0.31) * (1 - THREE.MathUtils.smoothstep(yN, 0.46, 0.52))
-      const legBoost = 1 + LEG_EMPHASIS * thighK
+      const convexN  = Math.min(1, Math.max(0, -sm[i] / scale))        // how much of a bulge
+      const concaveN = Math.min(1, Math.max(0,  sm[i] / scale))        // how much of a valley
       // formMask keeps the inflation on broad muscle forms but spares fine
       // detail, so thin fingers and facial features don't balloon.
-      disp[i] = inflate * height * headMask * footMask * convexN * formMask[i] * legBoost
+      let d = inflate * height * headMask * footMask * convexN * formMask[i]
+      // Thigh band (ramps in above the knee ~0.27·h, out at the hip ~0.50·h).
+      const thighK = THREE.MathUtils.smoothstep(yN, 0.25, 0.31) * (1 - THREE.MathUtils.smoothstep(yN, 0.46, 0.52))
+      // Definition, not bulk: carve the valleys between the quad heads / the
+      // hamstring split deeper (pull concave verts inward) so each head separates,
+      // and shave the whole thigh in a hair so it reads a touch smaller. Both are
+      // inward (negative) along the normal.
+      d -= LEG_DEFINE * height * footMask * formMask[i] * concaveN * thighK
+      d -= LEG_SLIM   * height * footMask * thighK
+      disp[i] = d
     }
     // Smooth the displacement field so the added mass reads as smooth volume.
     // More passes round the bellies off so muscles don't peak into points.
@@ -435,13 +441,15 @@ export default function HoloBody({ url = '/models/standard-male-figure.dae' }: {
       lightDirection: [0.25, 1.0, 0.4],
       surfaceBrightness: 0.46,  // dimmer fill — smaller overall glow
       rimStrength: 1.0,         // smaller silhouette glow
-      creaseStrength: 0.7,      // seam/muscle glow — lights the muscle-separation valleys
-                                // (quad sweep, hamstring split, ab grid) so the forms read
-      creaseThreshold: 0.46,    // cutoff so only the real valleys (not noise) light up
+      creaseStrength: 0.85,     // seam/muscle glow — lights the quad-head / hamstring valleys.
+                                // Gated to the legs only (creaseLeg* below) so the torso stays clean.
+      creaseThreshold: 0.40,    // low cutoff so the shallow valleys of the low-poly legs still light
       creaseWidth: 0.3,         // line softness band above the threshold
       creaseSharpness: 1.6,     // crisp, well-defined lines
       creaseRolloffLo: 0.74,    // start rolling the glow off earlier so the deepest pits
-      creaseRolloffHi: 0.93,    // (throat/clavicle hollow, groin) stop blooming into hotspots
+      creaseRolloffHi: 0.93,    // (groin) stop blooming into hotspots
+      creaseLegLo: 1.02,        // seam glow full below the hip (legs)…
+      creaseLegHi: 1.20,        // …and faded out above it, keeping the torso clean
       footFadeLo: 0.0,          // kill the bright sole rim that joins the feet
       footFadeHi: 0.12,
       headFadeLo: 1.64,         // calm the over-bright skull / face / eyes
