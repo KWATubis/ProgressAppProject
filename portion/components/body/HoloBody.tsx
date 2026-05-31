@@ -517,7 +517,22 @@ export function HoloBody({
 
   const { scene, coloredMeshes, wireOverlays, depthOverlays, depthMaterial, holoMaterial, wireMaterial, fitTransform } =
     useMemo(() => {
-      const root = collada.scene;
+      // Clone the cached loader scene per instance. BodyExplorer mounts two
+      // BodyScenes at once (the always-on preview card + the fullscreen overlay),
+      // and useLoader hands back a single shared object. A THREE object can only
+      // live in one scene graph, so two <primitive object={collada.scene}> nodes
+      // fight over it — one ends up at the wrong transform, rendering as a giant
+      // body behind the real one. Clone the graph AND every geometry, reset the
+      // processing flags, and never mutate the shared original, so each instance
+      // poses/enhances a pristine private copy.
+      const root = collada.scene.clone(true);
+      root.traverse((obj) => {
+        const m = obj as THREE.Mesh;
+        if (m.isMesh && m.geometry) {
+          m.geometry = m.geometry.clone();
+          m.geometry.userData = {};
+        }
+      });
       root.updateMatrixWorld(true);
 
       const meshes: THREE.Mesh[] = [];
@@ -576,6 +591,9 @@ export function HoloBody({
       });
       holoMaterial.depthTest = true;
       holoMaterial.depthWrite = false;
+
+      // Apply the holo material to every visible mesh of this instance's clone.
+      for (const m of meshes) m.material = holoMaterial;
 
       const depthMaterial = new THREE.MeshBasicMaterial({
         colorWrite: false,
@@ -683,17 +701,6 @@ export function HoloBody({
       };
     }, [collada]);
 
-  // Apply the holo material to every visible mesh.
-  useEffect(() => {
-    const root = collada.scene;
-    root.traverse((obj) => {
-      const m = obj as THREE.Mesh;
-      if (m.isMesh && !HIDE_PATTERNS.test(m.name) && !HIDE_PATTERNS.test(m.parent?.name ?? "")) {
-        m.material = holoMaterial;
-      }
-    });
-  }, [collada, holoMaterial]);
-
   // Repaint per-vertex muscle-state colours whenever the states change.
   useEffect(() => {
     const cyan = [0.357, 0.89, 1.0];
@@ -737,7 +744,7 @@ export function HoloBody({
     holoMaterial.update();
     if (spinRef.current) {
       spinRef.current.position.y = Math.sin(performance.now() * 0.0008) * 0.012;
-      if (autoRotate) spinRef.current.rotation.y += dt * 0.35;
+      if (autoRotate) spinRef.current.rotation.y += dt * 0.2;
     }
   });
 
