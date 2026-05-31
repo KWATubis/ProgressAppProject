@@ -6,6 +6,7 @@ import {
   Wallet,
   TrendingUp,
   Target,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
@@ -19,6 +20,7 @@ export const navItems: NavItem[] = [
   { href: "/health", label: "Health", icon: Dumbbell },
   { href: "/money", label: "Money", icon: Wallet },
   { href: "/progress", label: "Progress", icon: TrendingUp },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function isNavItemActive(pathname: string, href: string): boolean {

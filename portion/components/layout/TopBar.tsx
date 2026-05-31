@@ -1,4 +1,5 @@
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { Settings } from "lucide-react";
 import { MobileNav } from "@/components/layout/MobileNav";
 
 type TopBarProps = {
@@ -15,15 +16,17 @@ export function TopBar({ email, name }: TopBarProps) {
         <MobileNav />
         <span className="text-sm font-semibold text-foreground">Portion</span>
       </div>
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto flex items-center gap-3">
         {displayName && (
           <span className="hidden text-sm text-muted-foreground sm:inline">{displayName}</span>
         )}
-        <form action="/auth/logout" method="post">
-          <Button type="submit" variant="ghost" size="sm">
-            Sign out
-          </Button>
-        </form>
+        <Link
+          href="/settings"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          aria-label="Settings"
+        >
+          <Settings className="h-4 w-4" />
+        </Link>
       </div>
     </header>
   );
