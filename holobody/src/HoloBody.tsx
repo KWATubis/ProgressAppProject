@@ -11,11 +11,14 @@ const HIDE_PATTERNS = /teeth|gums|tongue|innereye/i
 // off the shoulder (with a slight forward swing so it leaves the dead-flat
 // coronal plane), then everything past the elbow adds a soft forward flex — and
 // shave a little thickness off the limb so it isn't chunky.
-const SHOULDER_DROP    = 0.95  // rad, whole-arm drop from the T-pose horizontal (~54°)
-const ELBOW_BEND       = 0.34  // rad, extra forearm flex (swings the hand forward)
-const ELBOW_FRAC       = 0.52  // along-arm fraction (shoulder→fingertip) where the forearm begins
-const ELBOW_BLEND      = 0.14  // smooth ramp width around the elbow
-const ARM_FORWARD      = 0.12  // rad, slight forward swing of the whole arm
+const SHOULDER_DROP    = 0.88  // rad, whole-arm drop from the A-pose toward the side; a touch shy
+                               // of clamped-to-the-body so the upper arm clears the lat (armpit gap)
+const ELBOW_BEND       = 0.46  // rad, forearm flex — bends the elbow so the hands carry forward off
+                               // the thighs instead of lying flat against them like a mannequin
+const ELBOW_FRAC       = 0.50  // along-arm fraction (shoulder→fingertip) where the forearm begins
+const ELBOW_BLEND      = 0.16  // smooth ramp width around the elbow
+const ARM_FORWARD      = 0.20  // rad, forward swing of the whole arm — lifts the hands out of the
+                               // dead coronal plane so they sit slightly in front of the hips
 const ARM_SLIM         = 0.86  // arm thickness scale toward its centerline (1 = unchanged)
 const SHOULDER_FRAC    = 0.11  // shoulder pivot X as fraction of T-pose half-width
 const ARM_BLEND_FRAC   = 0.06  // smooth blend width around shoulder
@@ -48,6 +51,18 @@ function poseArms(meshes: THREE.Mesh[]) {
   const blendBand    = size.x * ARM_BLEND_FRAC
   const reach        = Math.max(size.x * 0.5 - shoulderEdge, 1e-4) // shoulder → fingertip span
 
+  // Vertical gate for "is this an arm vertex". The X-only test (offX > shoulderEdge)
+  // is far too greedy on its own — it selects ~58% of the body (lats, hips, outer
+  // thighs, and the outer edges of the wide-stance feet), and with no height check
+  // those foot verts got rotated about the shoulder pivot by the full arm drop,
+  // sweeping them across the centerline into two bright crossing blades under the
+  // feet. This figure is an A-pose: the arm slopes from the shoulder (Y≈0.82·h) down
+  // to the hands (Y≈0.58·h), while the legs/feet sit below ~0.44·h. Fading the arm
+  // influence in across [0.44, 0.57]·h keeps the whole arm (hands included) but can
+  // never reach the legs or feet again.
+  const armBandLo = box.min.y + size.y * 0.44
+  const armBandHi = box.min.y + size.y * 0.57
+
   // Scratch objects reused across every vertex (no per-vertex allocation).
   const v       = new THREE.Vector3()
   const elbow   = new THREE.Vector3()
@@ -68,7 +83,8 @@ function poseArms(meshes: THREE.Mesh[]) {
       const y = pos.getY(i)
       const z = pos.getZ(i)
       const offX = Math.abs(x - center.x)
-      const w = smoothstep(shoulderEdge, shoulderEdge + blendBand, offX)
+      const wY = smoothstep(armBandLo, armBandHi, y)
+      const w = smoothstep(shoulderEdge, shoulderEdge + blendBand, offX) * wY
       if (w <= 0) continue
       const dir = x > center.x ? 1 : -1
 
