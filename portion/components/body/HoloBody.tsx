@@ -496,18 +496,31 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
 }
 
 // ---------------------------------------------------------------------------
-// trimHands — delete the hands/fingers. In the settled A-pose the hands rest at
-// hip height as the model's most finely tessellated geometry; rendered as a
-// translucent hologram those dense finger meshes read as bugged glowing blobs.
-// We detect them by mesh density (the baked `aForm` mask is ~0 on fine detail)
-// within the hand height band (below the head, above the calves) and drop any
-// triangle whose three corners are all hand verts, leaving the arm ending
-// cleanly at the wrist. Runs after enhanceMuscles (which bakes aForm) and before
-// the fit + classification so the figure resolves on the trimmed mesh.
+// trimHands — delete the hands/fingers. In the settled A-pose the hands rest
+// out beyond the hips at roughly 0.55–0.66·h (the arm slopes from the shoulder
+// at ~0.82·h down to the hands at ~0.58·h) as the model's most finely
+// tessellated geometry; rendered as a translucent hologram those dense finger
+// meshes read as bugged glowing blobs. We detect them by three cheap,
+// model-agnostic signals combined:
+//   • density   — the baked `aForm` mask is ~0 on fine detail (hands/face) and
+//                 ~1 on broad muscle forms, so the smooth-cylinder forearm is
+//                 excluded and only the finger mesh qualifies;
+//   • laterality — hands sit at the very tips of the arms (|x| near the arm
+//                 half-span), which excludes the equally-dense but CENTRAL
+//                 skull/face/ears so we can widen the height band toward the head;
+//   • height    — a generous mid-body band that excludes the feet.
+// Any triangle whose three corners are all hand verts is dropped, leaving the
+// arm ending cleanly at the wrist. Runs after enhanceMuscles (which bakes aForm)
+// and before the fit + classification so the figure resolves on the trimmed mesh.
+//
+// NB: the original band topped out at yHi=0.56·h — just *below* where the hands
+// actually rest — so it matched almost nothing, fell under the handCount bail,
+// and the hands rendered in full. The lateral gate is what lets the band cover
+// the hands without also catching the face.
 // ---------------------------------------------------------------------------
 function trimHands(
   geo: THREE.BufferGeometry,
-  { formThreshold = 0.28, yLo = 0.26, yHi = 0.56 } = {},
+  { formThreshold = 0.3, xFrac = 0.5, yLo = 0.4, yHi = 0.78 } = {},
 ) {
   if (geo.userData.handsTrimmed) return;
   const form = geo.getAttribute("aForm") as THREE.BufferAttribute | undefined;
@@ -519,12 +532,15 @@ function trimHands(
   const bb = geo.boundingBox!;
   const minY = bb.min.y;
   const height = bb.max.y - bb.min.y || 1;
+  const centerX = (bb.min.x + bb.max.x) * 0.5;
+  const halfWidth = Math.max((bb.max.x - bb.min.x) * 0.5, 1e-4);
 
   const isHand = new Uint8Array(N);
   let handCount = 0;
   for (let i = 0; i < N; i++) {
     const yN = (pos.getY(i) - minY) / height;
-    if (yN > yLo && yN < yHi && form.getX(i) < formThreshold) {
+    const xN = Math.abs(pos.getX(i) - centerX) / halfWidth; // 0 centreline → ~1 arm tip
+    if (yN > yLo && yN < yHi && xN > xFrac && form.getX(i) < formThreshold) {
       isHand[i] = 1;
       handCount++;
     }
