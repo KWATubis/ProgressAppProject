@@ -39,6 +39,15 @@ const LEG_DEFINE = 0.026;
 const LEG_SLIM = 0.006;
 const CALF_SLIM = 0.011;
 
+// ---- Hand region (shared by the smoothing pass + the shader's aHand mask) and
+// how hard the crumpled finger mesh is relaxed into a smooth, rounded hand.
+const HAND_FORM_MAX = 0.35; // aForm below this = fine detail (the finger mesh)
+const HAND_X_FRAC = 0.25; // |x| past this fraction of half-width = out on the arm
+const HAND_Y_LO = 0.35; // hand height band, normalised (0 feet → 1 head)
+const HAND_Y_HI = 0.74;
+const HAND_SMOOTH_ITERS = 12; // Laplacian passes over the hand verts
+const HAND_SMOOTH_STRENGTH = 0.6; // 0 = none … 1 = full move to neighbour average per pass
+
 // ---- Wireframe-overlay height fade.
 const WIRE_FOOT_LO = 0.0;
 const WIRE_FOOT_HI = 0.13;
@@ -479,6 +488,69 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
     sm = concavity(cx, cy, cz, nrm.nx, nrm.ny, nrm.nz);
   }
 
+  // ---- Relax the hands. The model's hand is a dense, crumpled low-poly mesh
+  // with splayed fingers; as a translucent wireframe hologram that reads as a
+  // mangled blob. Laplacian-smooth ONLY the hand verts (same density + mid-body
+  // height + lateral test as the shader's aHand mask) toward their neighbour
+  // average. The surrounding wrist verts stay anchored, so the splayed fingers
+  // collapse and round into a smooth, closed hand that blends into the forearm.
+  // Reuses the welded canonical verts + adjacency already built above.
+  {
+    const minY = bb.min.y;
+    const centerX = (bb.min.x + bb.max.x) * 0.5;
+    const halfWidth = Math.max((bb.max.x - bb.min.x) * 0.5, 1e-4);
+    const isHand = new Uint8Array(M);
+    let handN = 0;
+    for (let i = 0; i < M; i++) {
+      const yN = (cy[i] - minY) / height;
+      const xN = Math.abs(cx[i] - centerX) / halfWidth;
+      if (formMask[i] < HAND_FORM_MAX && yN > HAND_Y_LO && yN < HAND_Y_HI && xN > HAND_X_FRAC) {
+        isHand[i] = 1;
+        handN++;
+      }
+    }
+    if (handN >= 30) {
+      const tx = new Float32Array(M);
+      const ty = new Float32Array(M);
+      const tz = new Float32Array(M);
+      for (let pass = 0; pass < HAND_SMOOTH_ITERS; pass++) {
+        for (let i = 0; i < M; i++) {
+          const ns = adj[i];
+          if (!isHand[i] || ns.size === 0) {
+            tx[i] = cx[i];
+            ty[i] = cy[i];
+            tz[i] = cz[i];
+            continue;
+          }
+          let sx = 0,
+            sy = 0,
+            sz = 0;
+          for (const j of ns) {
+            sx += cx[j];
+            sy += cy[j];
+            sz += cz[j];
+          }
+          const inv = 1 / ns.size;
+          tx[i] = cx[i] + (sx * inv - cx[i]) * HAND_SMOOTH_STRENGTH;
+          ty[i] = cy[i] + (sy * inv - cy[i]) * HAND_SMOOTH_STRENGTH;
+          tz[i] = cz[i] + (sz * inv - cz[i]) * HAND_SMOOTH_STRENGTH;
+        }
+        for (let i = 0; i < M; i++) {
+          cx[i] = tx[i];
+          cy[i] = ty[i];
+          cz[i] = tz[i];
+        }
+      }
+      for (let i = 0; i < N; i++) {
+        const c = orig2canon[i];
+        posAttr.setXYZ(i, cx[c], cy[c], cz[c]);
+      }
+      posAttr.needsUpdate = true;
+      nrm = computeNormals(cx, cy, cz);
+      sm = concavity(cx, cy, cz, nrm.nx, nrm.ny, nrm.nz);
+    }
+  }
+
   const sorted = Float32Array.from(sm).sort();
   const lo = sorted[Math.max(0, Math.floor(M * 0.02))];
   const hi = sorted[Math.min(M - 1, Math.floor(M * 0.98))];
@@ -518,7 +590,7 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
 // ---------------------------------------------------------------------------
 function markHands(
   geo: THREE.BufferGeometry,
-  { formThreshold = 0.35, xFrac = 0.25, yLo = 0.35, yHi = 0.74 } = {},
+  { formThreshold = HAND_FORM_MAX, xFrac = HAND_X_FRAC, yLo = HAND_Y_LO, yHi = HAND_Y_HI } = {},
 ) {
   if (geo.userData.handsMarked) return;
   const pos = geo.attributes.position;
