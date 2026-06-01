@@ -88,8 +88,9 @@ model Profile {
   activityTypes     ActivityType[]
   wellnessDays      WellnessDay[]
   customMetrics     CustomMetric[]
-  voiceNotes        DailyVoiceNote[]
-  onboardingSession OnboardingSession?
+  voiceNotes          DailyVoiceNote[]
+  weeklyReflections   WeeklyReflection[]
+  onboardingSession   OnboardingSession?
 }
 
 model DailyVoiceNote {
@@ -103,6 +104,22 @@ model DailyVoiceNote {
   createdAt   DateTime @default(now())
 
   @@unique([profileId, date])
+  @@index([profileId])
+}
+
+model WeeklyReflection {
+  id        String   @id @default(cuid())
+  profileId String
+  weekStart DateTime
+  wins      String   @default("") @db.Text
+  learning  String   @default("") @db.Text
+  priority  String   @default("") @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, weekStart])
   @@index([profileId])
 }
 
@@ -191,9 +208,10 @@ model TaskLog {
   task      Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
   date      DateTime
   status    TaskStatus @default(PENDING)
-  note      String?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  note          String?
+  recoveredLate Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@unique([taskId, date])
 }

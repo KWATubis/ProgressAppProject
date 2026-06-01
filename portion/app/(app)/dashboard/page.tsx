@@ -8,8 +8,11 @@ import { TodayTaskList, type TodayTask } from "@/components/dashboard/TodayTaskL
 import { QuickStats } from "@/components/dashboard/QuickStats";
 import { CompoundingWeekCard } from "@/components/dashboard/CompoundingWeekCard";
 import { ShareProgressButton } from "@/components/dashboard/ShareProgressButton";
+import { StreakRecoveryBanner } from "@/components/dashboard/StreakRecoveryBanner";
 import { withDerivedCurrent } from "@/lib/goalMetrics.server";
 import { computeWeeklySummary } from "@/lib/dashboard/weekly-summary";
+import { detectBrokenStreaks } from "@/lib/tasks/streaks";
+import { getWeekDates } from "@/lib/utils/dates";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -20,8 +23,12 @@ export default async function DashboardPage() {
 
   const today = toUtcMidnight();
   const todayISO = formatISODate(today);
+  const isMonday = today.getUTCDay() === 1;
+  // On Monday show last week's Sunday reflection (getWeekDates gives [Sun…Sat] of current week,
+  // and on Monday that Sunday is yesterday — exactly when the user would have filled it in).
+  const reflectionWeekStart = isMonday ? getWeekDates(today)[0] : null;
 
-  const [profile, rawGoals, tasks, logsToday, latestWeight, dietToday, latestSocial, weeklySummary] = await Promise.all([
+  const [profile, rawGoals, tasks, logsToday, latestWeight, dietToday, latestSocial, weeklySummary, brokenStreaks, lastReflection] = await Promise.all([
     prisma.profile.findUnique({ where: { id: user.id }, select: { name: true, email: true } }),
     prisma.goal.findMany({
       where: { profileId: user.id, isActive: true, activityTypeId: null },
@@ -43,6 +50,13 @@ export default async function DashboardPage() {
       orderBy: { date: "desc" },
     }),
     computeWeeklySummary(user.id),
+    detectBrokenStreaks(user.id),
+    reflectionWeekStart
+      ? prisma.weeklyReflection.findUnique({
+          where: { profileId_weekStart: { profileId: user.id, weekStart: reflectionWeekStart } },
+          select: { wins: true, learning: true, priority: true },
+        })
+      : Promise.resolve(null),
   ]);
 
   const goals = await withDerivedCurrent(rawGoals);
@@ -108,7 +122,27 @@ export default async function DashboardPage() {
         <ShareProgressButton />
       </div>
 
+      <StreakRecoveryBanner streaks={brokenStreaks} />
+
       <CompoundingWeekCard summary={weeklySummary} />
+
+      {lastReflection && (
+        <div className="rounded-xl border border-border bg-card/50 p-5 space-y-3">
+          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Last week</p>
+          {lastReflection.wins && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">🏆 Wins</p>
+              <p className="text-sm whitespace-pre-wrap">{lastReflection.wins}</p>
+            </div>
+          )}
+          {lastReflection.priority && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">🎯 This week&apos;s #1</p>
+              <p className="text-sm font-medium">{lastReflection.priority}</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <QuickStats
         stats={[

@@ -1,0 +1,1 @@
+ALTER TABLE "TaskLog" ADD COLUMN "recoveredLate" BOOLEAN NOT NULL DEFAULT false;
