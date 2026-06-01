@@ -139,7 +139,7 @@ export function BodyExplorer({ muscleStates, wellnessTrend }: Props) {
             {fullscreenMode === "idle" ? (
               <div className="pointer-events-none absolute bottom-5 left-1/2 z-10 -translate-x-1/2 text-center">
                 <p className="text-[10px] uppercase tracking-[0.28em] text-cyan-200/25">
-                  Click a muscle · Scroll to zoom · Drag to rotate
+                  Click a muscle · Scroll to zoom · Drag to rotate · Right-drag to move
                 </p>
               </div>
             ) : null}

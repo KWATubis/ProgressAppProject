@@ -44,6 +44,8 @@ export interface HolographicMaterialParams {
   creaseRolloffHi?: number; // crease value where the deepest-pit glow is fully gone
   creaseLegLo?: number; // world-Y below which the seam glow is full (legs)
   creaseLegHi?: number; // world-Y above which the seam glow is gone (clean torso)
+  creaseCalfLo?: number; // world-Y below which the seam glow is damped (lower leg / shins)
+  creaseCalfHi?: number; // world-Y above which the seam glow is full again (quads)
   footFadeLo?: number; // world-Y where the foot glow fade starts (kills the sole line)
   footFadeHi?: number; // world-Y where glow returns to full above the feet
   headFadeLo?: number; // world-Y where the head glow damp starts
@@ -51,6 +53,7 @@ export interface HolographicMaterialParams {
   headGlow?: number; // rim+seam multiplier on the head (lower = dimmer head)
   headFill?: number; // surface-fill multiplier on the head
   stateMix?: number; // 0 = ignore muscle-state colour (pure cyan), 1 = fully tint by state
+  stateWash?: number; // even, structure-independent fill of the recovery colour (consistency)
 }
 
 export class HolographicMaterial extends ShaderMaterial {
@@ -159,6 +162,8 @@ export class HolographicMaterial extends ShaderMaterial {
       uniform float creaseRolloffHi;
       uniform float creaseLegLo;
       uniform float creaseLegHi;
+      uniform float creaseCalfLo;
+      uniform float creaseCalfHi;
       uniform float footFadeLo;
       uniform float footFadeHi;
       uniform float headFadeLo;
@@ -166,6 +171,7 @@ export class HolographicMaterial extends ShaderMaterial {
       uniform float headGlow;
       uniform float headFill;
       uniform float stateMix;
+      uniform float stateWash;
 
       float flicker( float amt, float t ) {
         return clamp( fract( cos( t ) * 43758.5453123 ), amt, 1.0 );
@@ -234,8 +240,13 @@ export class HolographicMaterial extends ShaderMaterial {
         float headK    = smoothstep(headFadeLo, headFadeHi, vWorldY);
         float headDamp = mix(1.0, headGlow, headK);
         float legMask  = 1.0 - smoothstep(creaseLegLo, creaseLegHi, vWorldY);
+        // Damp the seam glow on the lower leg — on the low-poly calves the
+        // muscle-separation creases land as bright vertical blades down the
+        // shins. Keep it full from the knee up (quad definition), kill it on the
+        // calves/shins below.
+        float calfMask = smoothstep(creaseCalfLo, creaseCalfHi, vWorldY);
         rim        *= footFade * headDamp;
-        seamGlow   *= footFade * headDamp * legMask;
+        seamGlow   *= footFade * headDamp * legMask * calfMask;
         shadedFill *= footFade * mix(1.0, headFill, headK);
 
         vec3 finalColor;
@@ -246,6 +257,16 @@ export class HolographicMaterial extends ShaderMaterial {
         }
         finalColor += seamGlow;
 
+        // ---- Even recovery wash: a consistent, softly-lit fill of the muscle's
+        // recovery colour wherever it's tracked, INDEPENDENT of the cyan-tuned
+        // seam/rim glow. Without this the same "rested" green blazes along the
+        // leg seams yet reads dim on the torso (same state, different brightness);
+        // this lays an even base so each muscle group reads its recovery colour
+        // consistently across the whole body.
+        float stateAmt = clamp(vHasState, 0.0, 1.0) * stateMix;
+        float washShade = mix(0.65, 1.0, sharpNdotL); // keep a soft sense of form
+        finalColor += vStateColor * stateAmt * stateWash * washShade * footFade * headDamp;
+
         // ---- Selection highlight: brighten the picked muscle group and add a
         // crisp state-coloured rim so the user sees exactly what they clicked.
         float sel = clamp(vSelected, 0.0, 1.0);
@@ -253,9 +274,10 @@ export class HolographicMaterial extends ShaderMaterial {
         finalColor += holoCol * sel * fresnelEffect * 1.2;
 
         // ---- Alpha: translucent across the bellies so the grid and far side
-        // bleed through, snapping back to solid along the glowing seams (legs only).
+        // bleed through, snapping back to solid along the glowing seams (legs
+        // only, and not on the damped calves so they don't draw opaque blades).
         float shadedAlpha = hologramOpacity * mix(1.0 - muscleEmphasis * 0.85, 1.0, sharpNdotL);
-        shadedAlpha = max(shadedAlpha, seam * legMask);
+        shadedAlpha = max(shadedAlpha, seam * legMask * calfMask);
         shadedAlpha = max(shadedAlpha, sel * 0.55);
 
         gl_FragColor = vec4(finalColor, clamp(shadedAlpha, 0.0, 1.0));
@@ -286,6 +308,8 @@ export class HolographicMaterial extends ShaderMaterial {
       creaseRolloffHi: new Uniform(parameters.creaseRolloffHi ?? 0.98),
       creaseLegLo: new Uniform(parameters.creaseLegLo ?? 1.02),
       creaseLegHi: new Uniform(parameters.creaseLegHi ?? 1.2),
+      creaseCalfLo: new Uniform(parameters.creaseCalfLo ?? 0.4),
+      creaseCalfHi: new Uniform(parameters.creaseCalfHi ?? 0.62),
       footFadeLo: new Uniform(parameters.footFadeLo ?? 0.0),
       footFadeHi: new Uniform(parameters.footFadeHi ?? 0.1),
       headFadeLo: new Uniform(parameters.headFadeLo ?? 1.64),
@@ -293,6 +317,7 @@ export class HolographicMaterial extends ShaderMaterial {
       headGlow: new Uniform(parameters.headGlow ?? 0.28),
       headFill: new Uniform(parameters.headFill ?? 0.5),
       stateMix: new Uniform(parameters.stateMix ?? 0.85),
+      stateWash: new Uniform(parameters.stateWash ?? 0.45),
     };
 
     this.setValues(parameters as Record<string, unknown>);

@@ -495,12 +495,91 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
   geo.userData.musclesProcessed = true;
 }
 
+// ---------------------------------------------------------------------------
+// trimHands — delete the hands/fingers. In the settled A-pose the hands rest at
+// hip height as the model's most finely tessellated geometry; rendered as a
+// translucent hologram those dense finger meshes read as bugged glowing blobs.
+// We detect them by mesh density (the baked `aForm` mask is ~0 on fine detail)
+// within the hand height band (below the head, above the calves) and drop any
+// triangle whose three corners are all hand verts, leaving the arm ending
+// cleanly at the wrist. Runs after enhanceMuscles (which bakes aForm) and before
+// the fit + classification so the figure resolves on the trimmed mesh.
+// ---------------------------------------------------------------------------
+function trimHands(
+  geo: THREE.BufferGeometry,
+  { formThreshold = 0.28, yLo = 0.26, yHi = 0.56 } = {},
+) {
+  if (geo.userData.handsTrimmed) return;
+  const form = geo.getAttribute("aForm") as THREE.BufferAttribute | undefined;
+  const pos = geo.attributes.position;
+  const N = pos.count;
+  if (!form || !N) return;
+
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox!;
+  const minY = bb.min.y;
+  const height = bb.max.y - bb.min.y || 1;
+
+  const isHand = new Uint8Array(N);
+  let handCount = 0;
+  for (let i = 0; i < N; i++) {
+    const yN = (pos.getY(i) - minY) / height;
+    if (yN > yLo && yN < yHi && form.getX(i) < formThreshold) {
+      isHand[i] = 1;
+      handCount++;
+    }
+  }
+  if (handCount < 50) return; // nothing hand-like resolved — bail safely
+
+  const index = geo.index;
+  const triCount = Math.floor((index ? index.count : N) / 3);
+  if (index) {
+    const newIdx: number[] = [];
+    for (let t = 0; t < triCount; t++) {
+      const a = index.getX(t * 3),
+        b = index.getX(t * 3 + 1),
+        c = index.getX(t * 3 + 2);
+      if (isHand[a] && isHand[b] && isHand[c]) continue;
+      newIdx.push(a, b, c);
+    }
+    geo.setIndex(newIdx);
+  } else {
+    const names = Object.keys(geo.attributes);
+    const out: Record<string, number[]> = {};
+    for (const n of names) out[n] = [];
+    for (let t = 0; t < triCount; t++) {
+      const a = t * 3,
+        b = t * 3 + 1,
+        c = t * 3 + 2;
+      if (isHand[a] && isHand[b] && isHand[c]) continue;
+      for (const vi of [a, b, c]) {
+        for (const n of names) {
+          const at = geo.attributes[n];
+          for (let k = 0; k < at.itemSize; k++) out[n].push(at.getComponent(vi, k));
+        }
+      }
+    }
+    for (const n of names) {
+      const at = geo.attributes[n];
+      geo.setAttribute(n, new THREE.BufferAttribute(new Float32Array(out[n]), at.itemSize));
+    }
+  }
+  geo.computeVertexNormals();
+  geo.userData.handsTrimmed = true;
+}
+
+// Per-muscle focus info the camera + body-rotation use to frame a clicked
+// group: its height (fitted world Y) and whether it sits on the front (+z) or
+// back (−z) of the body. Indexed to match MUSCLE_GROUPS.
+export type GroupCentroid = { y: number; front: boolean } | null;
+
 type Props = {
   muscleStates: Record<MuscleGroup, MuscleState>;
   selection: BodySelection;
   onSelect: (s: BodySelection) => void;
   autoRotate: boolean;
   interactive: boolean;
+  onFocusData?: (centroids: GroupCentroid[]) => void;
   url?: string;
 };
 
@@ -510,12 +589,13 @@ export function HoloBody({
   onSelect,
   autoRotate,
   interactive,
+  onFocusData,
   url = "/models/standard-male-figure.dae",
 }: Props) {
   const collada = useLoader(ColladaLoader, url) as unknown as { scene: THREE.Scene };
   const spinRef = useRef<THREE.Group>(null);
 
-  const { scene, coloredMeshes, wireOverlays, depthOverlays, depthMaterial, holoMaterial, wireMaterial, fitTransform } =
+  const { scene, coloredMeshes, wireOverlays, depthOverlays, depthMaterial, holoMaterial, wireMaterial, fitTransform, groupCentroids } =
     useMemo(() => {
       // Clone the cached loader scene per instance. BodyExplorer mounts two
       // BodyScenes at once (the always-on preview card + the fullscreen overlay),
@@ -557,6 +637,7 @@ export function HoloBody({
       }
       if (bodyMesh) trimInteriorHeadCavities(bodyMesh.geometry);
       for (const m of meshes) enhanceMuscles(m.geometry);
+      for (const m of meshes) trimHands(m.geometry);
 
       const holoMaterial = new HolographicMaterial({
         hologramColor: "#5be3ff",
@@ -581,6 +662,8 @@ export function HoloBody({
         creaseRolloffHi: 0.93,
         creaseLegLo: 1.02,
         creaseLegHi: 1.2,
+        creaseCalfLo: 0.4,
+        creaseCalfHi: 0.62,
         footFadeLo: 0.0,
         footFadeHi: 0.12,
         headFadeLo: 1.64,
@@ -588,6 +671,7 @@ export function HoloBody({
         headGlow: 0.28,
         headFill: 0.5,
         stateMix: 0.9,
+        stateWash: 0.45,
       });
       holoMaterial.depthTest = true;
       holoMaterial.depthWrite = false;
@@ -628,6 +712,11 @@ export function HoloBody({
       // space) and seed the muscle-state attributes the shader reads.
       const wv = new THREE.Vector3();
       const coloredMeshes: THREE.Mesh[] = [];
+      // Per-group centroid accumulators (fitted world space) so the camera +
+      // body rotation can frame whichever muscle is clicked.
+      const GN = MUSCLE_GROUPS.length;
+      const cSum = new Float64Array(GN * 3);
+      const cCnt = new Float64Array(GN);
       for (const m of meshes) {
         const geo = m.geometry;
         const pos = geo.attributes.position;
@@ -643,6 +732,12 @@ export function HoloBody({
           const xN = Math.abs(wv.x) / fittedHalfWidth;
           const gi = classifyMuscle(yN, xN, wv.z);
           groupIndex[i] = gi;
+          if (gi >= 0) {
+            cSum[gi * 3] += wv.x;
+            cSum[gi * 3 + 1] += wv.y;
+            cSum[gi * 3 + 2] += wv.z;
+            cCnt[gi]++;
+          }
           hasState[i] = gi >= 0 ? 1 : 0;
           stateColor[i * 3] = 0.357;
           stateColor[i * 3 + 1] = 0.89;
@@ -689,6 +784,14 @@ export function HoloBody({
         matrix: m.matrixWorld.clone(),
       }));
 
+      const groupCentroids: GroupCentroid[] = [];
+      for (let g = 0; g < GN; g++) {
+        groupCentroids[g] =
+          cCnt[g] > 0
+            ? { y: cSum[g * 3 + 1] / cCnt[g], front: cSum[g * 3 + 2] / cCnt[g] >= 0 }
+            : null;
+      }
+
       return {
         scene: root,
         coloredMeshes,
@@ -698,6 +801,7 @@ export function HoloBody({
         holoMaterial,
         wireMaterial,
         fitTransform,
+        groupCentroids,
       };
     }, [collada]);
 
@@ -740,11 +844,30 @@ export function HoloBody({
     }
   }, [coloredMeshes, selection]);
 
+  // Report the per-group centroids up once they're computed so the camera rig
+  // can frame whichever muscle is clicked.
+  useEffect(() => {
+    onFocusData?.(groupCentroids);
+  }, [groupCentroids, onFocusData]);
+
   useFrame((_, dt) => {
     holoMaterial.update();
-    if (spinRef.current) {
-      spinRef.current.position.y = Math.sin(performance.now() * 0.0008) * 0.012;
-      if (autoRotate) spinRef.current.rotation.y += dt * 0.2;
+    const g = spinRef.current;
+    if (!g) return;
+    g.position.y = Math.sin(performance.now() * 0.0008) * 0.012;
+    if (selection?.kind === "muscle") {
+      // Turn the body so the clicked muscle faces the camera (+z): front groups
+      // → 0, back groups → π. Lerp along the shortest arc so it never unwinds a
+      // full turn.
+      const c = groupCentroids[MUSCLE_GROUPS.indexOf(selection.group)];
+      const target = c && !c.front ? Math.PI : 0;
+      const TWO_PI = Math.PI * 2;
+      let diff = (target - g.rotation.y) % TWO_PI;
+      if (diff > Math.PI) diff -= TWO_PI;
+      if (diff < -Math.PI) diff += TWO_PI;
+      g.rotation.y += diff * (1 - Math.pow(0.0015, dt));
+    } else if (autoRotate) {
+      g.rotation.y += dt * 0.2;
     }
   });
 

@@ -1,14 +1,14 @@
 "use client";
 
-import { Suspense, useRef, useEffect, useMemo } from "react";
+import { Suspense, useRef, useState, useEffect, useMemo } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, ContactShadows } from "@react-three/drei";
 import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
-import type { MuscleGroup, MuscleState } from "@/lib/body/muscle-state";
+import { MUSCLE_GROUPS, type MuscleGroup, type MuscleState } from "@/lib/body/muscle-state";
 import type { BodySelection } from "./Humanoid";
-import HoloBody from "./HoloBody";
+import HoloBody, { type GroupCentroid } from "./HoloBody";
 
 type Mode = "preview" | "idle" | "focused";
 
@@ -34,21 +34,39 @@ const TARGETS = {
   },
 } as const;
 
-function CameraRig({ mode }: { mode: Mode }) {
+// Scratch vector reused for the per-frame pan-clamp correction (no allocation).
+const PAN_FIX = new THREE.Vector3();
+
+// Camera pose for a focused muscle at fitted-world height `y`. The body rotates
+// to present the muscle to +z, so we only need to track its height: drop/raise
+// the camera to the muscle and zoom in, with a slight 3/4 angle for depth.
+function focusedPose(y: number) {
+  const cy = THREE.MathUtils.clamp(y, 0.32, 1.78);
+  return {
+    pos: new THREE.Vector3(0.55, cy + 0.18, 1.85),
+    lookAt: new THREE.Vector3(0.12, cy, 0),
+  };
+}
+
+function CameraRig({ mode, focus }: { mode: Mode; focus: GroupCentroid }) {
   const { camera } = useThree();
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
   const desired = useRef({
-    pos: TARGETS.preview.pos.clone(),
-    look: TARGETS.preview.lookAt.clone(),
+    pos: TARGETS[mode].pos.clone(),
+    look: TARGETS[mode].lookAt.clone(),
   });
-  const settled = useRef(false);
+  // True while we're animating the camera to a new target. While animating we
+  // OWN the camera and OrbitControls is disabled — otherwise its residual
+  // damping/zoom state (left over from the user orbiting in `focused`) fights
+  // the lerp and the camera never pulls back out on deselect.
+  const animating = useRef(true);
 
   useEffect(() => {
-    const t = TARGETS[mode];
-    desired.current.pos = t.pos.clone();
-    desired.current.look = t.lookAt.clone();
-    settled.current = false;
-  }, [mode]);
+    const t = mode === "focused" && focus ? focusedPose(focus.y) : TARGETS[mode];
+    desired.current.pos.copy(t.pos);
+    desired.current.look.copy(t.lookAt);
+    animating.current = true;
+  }, [mode, focus]);
 
   useFrame((_, dt) => {
     const controls = controlsRef.current as unknown as {
@@ -57,22 +75,43 @@ function CameraRig({ mode }: { mode: Mode }) {
       enabled: boolean;
     } | null;
 
-    if (!settled.current) {
+    if (animating.current) {
       const k = 1 - Math.pow(0.0001, dt);
       camera.position.lerp(desired.current.pos, k);
       if (controls) {
+        // Hold input off and drive the look-at ourselves — do NOT call
+        // controls.update() mid-flight, so there's zero tug-of-war.
+        controls.enabled = false;
         controls.target.lerp(desired.current.look, k);
+        camera.lookAt(controls.target);
       } else {
         camera.lookAt(desired.current.look);
       }
-      if (camera.position.distanceTo(desired.current.pos) < 0.015) {
-        settled.current = true;
+      if (camera.position.distanceTo(desired.current.pos) < 0.02) {
+        animating.current = false;
+        if (controls) controls.target.copy(desired.current.look);
       }
+      return;
     }
 
+    // Settled: hand the camera back to OrbitControls. Skip preview entirely —
+    // it's a fixed auto-rotating card, and update()'s distance clamp would dolly
+    // it in from its wide framing.
     if (controls) {
-      controls.enabled = mode !== "preview";
+      if (mode === "preview") {
+        controls.enabled = false;
+        return;
+      }
+      controls.enabled = true;
       controls.update();
+      // Keep the user from panning the figure out of frame: clamp the orbit
+      // target to a box around the body and carry the camera with the clamp.
+      const t = controls.target;
+      const cx = THREE.MathUtils.clamp(t.x, -0.7, 0.7);
+      const cy = THREE.MathUtils.clamp(t.y, 0.3, 1.9);
+      const cz = THREE.MathUtils.clamp(t.z, -0.7, 0.7);
+      camera.position.add(PAN_FIX.set(cx - t.x, cy - t.y, cz - t.z));
+      t.set(cx, cy, cz);
     }
   });
 
@@ -80,9 +119,11 @@ function CameraRig({ mode }: { mode: Mode }) {
     <OrbitControls
       ref={controlsRef}
       target={TARGETS.preview.lookAt.toArray()}
-      enablePan={false}
+      enablePan
+      screenSpacePanning
+      panSpeed={0.8}
       minDistance={1.0}
-      maxDistance={5.0}
+      maxDistance={3.8}
       minPolarAngle={Math.PI * 0.15}
       maxPolarAngle={Math.PI * 0.88}
       dampingFactor={0.06}
@@ -226,6 +267,12 @@ function GridFloor() {
 }
 
 export default function BodyScene({ muscleStates, selection, onSelect, mode }: Props) {
+  const [focusData, setFocusData] = useState<GroupCentroid[] | null>(null);
+  const focus =
+    mode === "focused" && selection?.kind === "muscle" && focusData
+      ? focusData[MUSCLE_GROUPS.indexOf(selection.group)] ?? null
+      : null;
+
   return (
     <Canvas
       shadows
@@ -254,6 +301,7 @@ export default function BodyScene({ muscleStates, selection, onSelect, mode }: P
           onSelect={onSelect}
           autoRotate={mode !== "focused"}
           interactive={mode !== "preview"}
+          onFocusData={setFocusData}
         />
         {mode !== "preview" ? <GridFloor /> : null}
         {mode !== "preview" ? <AtmosphereParticles count={mode === "focused" ? 180 : 260} /> : null}
@@ -270,7 +318,7 @@ export default function BodyScene({ muscleStates, selection, onSelect, mode }: P
         ) : null}
       </Suspense>
 
-      <CameraRig mode={mode} />
+      <CameraRig mode={mode} focus={focus} />
 
       <EffectComposer multisampling={0} enableNormalPass={false}>
         <Bloom
