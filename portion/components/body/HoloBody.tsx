@@ -45,6 +45,7 @@ const WIRE_FOOT_HI = 0.13;
 const WIRE_HEAD_LO = 1.64;
 const WIRE_HEAD_HI = 1.82;
 const WIRE_HEAD_GLOW = 0.28;
+const WIRE_HAND_GLOW = 0.4; // dim the dense hand-mesh wireframe so it reads as a clean hand, not a tangle
 
 const TARGET_HEIGHT = 2.0;
 
@@ -496,92 +497,51 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
 }
 
 // ---------------------------------------------------------------------------
-// trimHands — delete the hands/fingers. In the settled A-pose the hands rest
-// out beyond the hips at roughly 0.55–0.66·h (the arm slopes from the shoulder
-// at ~0.82·h down to the hands at ~0.58·h) as the model's most finely
-// tessellated geometry; rendered as a translucent hologram those dense finger
-// meshes read as bugged glowing blobs. We detect them by three cheap,
-// model-agnostic signals combined:
-//   • density   — the baked `aForm` mask is ~0 on fine detail (hands/face) and
-//                 ~1 on broad muscle forms, so the smooth-cylinder forearm is
-//                 excluded and only the finger mesh qualifies;
-//   • laterality — hands sit at the very tips of the arms (|x| near the arm
-//                 half-span), which excludes the equally-dense but CENTRAL
-//                 skull/face/ears so we can widen the height band toward the head;
-//   • height    — a generous mid-body band that excludes the feet.
-// Any triangle whose three corners are all hand verts is dropped, leaving the
-// arm ending cleanly at the wrist. Runs after enhanceMuscles (which bakes aForm)
-// and before the fit + classification so the figure resolves on the trimmed mesh.
-//
-// NB: the original band topped out at yHi=0.56·h — just *below* where the hands
-// actually rest — so it matched almost nothing, fell under the handCount bail,
-// and the hands rendered in full. The lateral gate is what lets the band cover
-// the hands without also catching the face.
+// markHands — flag the hand/finger vertices WITHOUT deleting them. In the
+// settled A-pose the hands rest out beyond the hips at roughly 0.5–0.7·h as the
+// model's most finely tessellated geometry. Rendered as a translucent hologram
+// that dense finger mesh otherwise glitches two ways: (a) the muscle classifier
+// mistakes it for forearm/biceps and washes it with the recovery colour — the
+// bright GREEN blob — and (b) its tiny triangles pile the rim/seam glow + the
+// wireframe into a busy tangle. So we keep the hands but bake a per-vertex
+// `aHand` mask: the classifier leaves those verts untracked (plain cyan, no
+// wash, like the head/feet) and the shader + wireframe damp the glow on them, so
+// each hand reads as a smooth, dim continuation of the forearm instead of a
+// glitch. Detected by three cheap, model-agnostic signals:
+//   • density   — the baked `aForm` mask is ~0 on fine detail, so the smooth
+//                 forearm cylinder is excluded and only the fingers qualify;
+//   • height    — a mid-body band that excludes the feet and the dense skull;
+//   • laterality — |x| out toward the arms, excluding any central face verts.
+// Runs after enhanceMuscles (which bakes aForm) and before classification so the
+// mask is ready downstream. Always writes `aHand` (all-zero on non-hand meshes)
+// so the shader attribute is present on every geometry.
 // ---------------------------------------------------------------------------
-function trimHands(
+function markHands(
   geo: THREE.BufferGeometry,
-  { formThreshold = 0.3, xFrac = 0.5, yLo = 0.4, yHi = 0.78 } = {},
+  { formThreshold = 0.35, xFrac = 0.25, yLo = 0.35, yHi = 0.74 } = {},
 ) {
-  if (geo.userData.handsTrimmed) return;
-  const form = geo.getAttribute("aForm") as THREE.BufferAttribute | undefined;
+  if (geo.userData.handsMarked) return;
   const pos = geo.attributes.position;
   const N = pos.count;
-  if (!form || !N) return;
+  if (!N) return;
 
-  geo.computeBoundingBox();
-  const bb = geo.boundingBox!;
-  const minY = bb.min.y;
-  const height = bb.max.y - bb.min.y || 1;
-  const centerX = (bb.min.x + bb.max.x) * 0.5;
-  const halfWidth = Math.max((bb.max.x - bb.min.x) * 0.5, 1e-4);
-
-  const isHand = new Uint8Array(N);
-  let handCount = 0;
-  for (let i = 0; i < N; i++) {
-    const yN = (pos.getY(i) - minY) / height;
-    const xN = Math.abs(pos.getX(i) - centerX) / halfWidth; // 0 centreline → ~1 arm tip
-    if (yN > yLo && yN < yHi && xN > xFrac && form.getX(i) < formThreshold) {
-      isHand[i] = 1;
-      handCount++;
+  const hand = new Float32Array(N); // 0 everywhere by default
+  const form = geo.getAttribute("aForm") as THREE.BufferAttribute | undefined;
+  if (form) {
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox!;
+    const minY = bb.min.y;
+    const height = bb.max.y - bb.min.y || 1;
+    const centerX = (bb.min.x + bb.max.x) * 0.5;
+    const halfWidth = Math.max((bb.max.x - bb.min.x) * 0.5, 1e-4);
+    for (let i = 0; i < N; i++) {
+      const yN = (pos.getY(i) - minY) / height;
+      const xN = Math.abs(pos.getX(i) - centerX) / halfWidth; // 0 centreline → ~1 arm tip
+      if (yN > yLo && yN < yHi && xN > xFrac && form.getX(i) < formThreshold) hand[i] = 1;
     }
   }
-  if (handCount < 50) return; // nothing hand-like resolved — bail safely
-
-  const index = geo.index;
-  const triCount = Math.floor((index ? index.count : N) / 3);
-  if (index) {
-    const newIdx: number[] = [];
-    for (let t = 0; t < triCount; t++) {
-      const a = index.getX(t * 3),
-        b = index.getX(t * 3 + 1),
-        c = index.getX(t * 3 + 2);
-      if (isHand[a] && isHand[b] && isHand[c]) continue;
-      newIdx.push(a, b, c);
-    }
-    geo.setIndex(newIdx);
-  } else {
-    const names = Object.keys(geo.attributes);
-    const out: Record<string, number[]> = {};
-    for (const n of names) out[n] = [];
-    for (let t = 0; t < triCount; t++) {
-      const a = t * 3,
-        b = t * 3 + 1,
-        c = t * 3 + 2;
-      if (isHand[a] && isHand[b] && isHand[c]) continue;
-      for (const vi of [a, b, c]) {
-        for (const n of names) {
-          const at = geo.attributes[n];
-          for (let k = 0; k < at.itemSize; k++) out[n].push(at.getComponent(vi, k));
-        }
-      }
-    }
-    for (const n of names) {
-      const at = geo.attributes[n];
-      geo.setAttribute(n, new THREE.BufferAttribute(new Float32Array(out[n]), at.itemSize));
-    }
-  }
-  geo.computeVertexNormals();
-  geo.userData.handsTrimmed = true;
+  geo.setAttribute("aHand", new THREE.BufferAttribute(hand, 1));
+  geo.userData.handsMarked = true;
 }
 
 // Per-muscle focus info the camera + body-rotation use to frame a clicked
@@ -653,7 +613,7 @@ export function HoloBody({
       }
       if (bodyMesh) trimInteriorHeadCavities(bodyMesh.geometry);
       for (const m of meshes) enhanceMuscles(m.geometry);
-      for (const m of meshes) trimHands(m.geometry);
+      for (const m of meshes) markHands(m.geometry);
 
       const holoMaterial = new HolographicMaterial({
         hologramColor: "#5be3ff",
@@ -686,6 +646,8 @@ export function HoloBody({
         headFadeHi: 1.8,
         headGlow: 0.28,
         headFill: 0.5,
+        handGlow: 0.5,
+        handFill: 0.7,
         stateMix: 0.9,
         stateWash: 0.45,
       });
@@ -738,6 +700,7 @@ export function HoloBody({
         const pos = geo.attributes.position;
         const vc = pos.count;
         const full = groupM.clone().multiply(m.matrixWorld);
+        const handAttr = geo.getAttribute("aHand") as THREE.BufferAttribute | undefined;
         const groupIndex = new Int8Array(vc);
         const hasState = new Float32Array(vc);
         const stateColor = new Float32Array(vc * 3); // cyan until first paint
@@ -746,7 +709,11 @@ export function HoloBody({
           wv.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(full);
           const yN = wv.y / TARGET_HEIGHT;
           const xN = Math.abs(wv.x) / fittedHalfWidth;
-          const gi = classifyMuscle(yN, xN, wv.z);
+          // Hands are kept but left UNTRACKED: classifying them as forearm/biceps
+          // washed the dense finger mesh with the recovery colour (the green blob).
+          // aHand (baked in markHands) forces those verts back to plain cyan.
+          const gi =
+            handAttr && handAttr.getX(i) > 0.5 ? -1 : classifyMuscle(yN, xN, wv.z);
           groupIndex[i] = gi;
           if (gi >= 0) {
             cSum[gi * 3] += wv.x;
@@ -779,14 +746,34 @@ export function HoloBody({
       const wireOverlays = meshes.map((m) => {
         const geometry = new THREE.WireframeGeometry(m.geometry);
         const full = groupM.clone().multiply(m.matrixWorld);
+        // WireframeGeometry drops custom attributes but copies vertex positions
+        // verbatim, so build a quantised position → hand lookup from the source
+        // mesh to damp the wireframe on the dense hand mesh too.
+        const srcPos = m.geometry.attributes.position;
+        const srcHand = m.geometry.getAttribute("aHand") as THREE.BufferAttribute | undefined;
+        m.geometry.computeBoundingBox();
+        const mbb = m.geometry.boundingBox!;
+        const q = 1 / ((mbb.min.distanceTo(mbb.max) || 1) * 1e-5);
+        const keyOf = (x: number, y: number, z: number) =>
+          `${Math.round(x * q)}|${Math.round(y * q)}|${Math.round(z * q)}`;
+        const handKeys = new Set<string>();
+        if (srcHand) {
+          for (let i = 0; i < srcPos.count; i++)
+            if (srcHand.getX(i) > 0.5)
+              handKeys.add(keyOf(srcPos.getX(i), srcPos.getY(i), srcPos.getZ(i)));
+        }
         const wp = geometry.attributes.position;
         const colors = new Float32Array(wp.count * 3);
         for (let i = 0; i < wp.count; i++) {
-          wireV.set(wp.getX(i), wp.getY(i), wp.getZ(i)).applyMatrix4(full);
+          const lx = wp.getX(i),
+            ly = wp.getY(i),
+            lz = wp.getZ(i);
+          wireV.set(lx, ly, lz).applyMatrix4(full);
           const footFade = smoothstep(WIRE_FOOT_LO, WIRE_FOOT_HI, wireV.y);
           const headK = smoothstep(WIRE_HEAD_LO, WIRE_HEAD_HI, wireV.y);
           const headDamp = 1 + (WIRE_HEAD_GLOW - 1) * headK;
-          const f = footFade * headDamp;
+          const handDamp = handKeys.has(keyOf(lx, ly, lz)) ? WIRE_HAND_GLOW : 1;
+          const f = footFade * headDamp * handDamp;
           colors[i * 3] = f;
           colors[i * 3 + 1] = f;
           colors[i * 3 + 2] = f;
