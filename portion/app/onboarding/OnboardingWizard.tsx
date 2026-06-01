@@ -16,12 +16,13 @@ import {
 } from "lucide-react";
 import { savePlan } from "./actions";
 import { ArchetypePicker } from "./ArchetypePicker";
+import { buildAthletePlan } from "./defaults";
 import type { Archetype, ArchetypeId } from "./defaults";
 import type { Frequency, PillarPlan, WizardGoal, WizardHabit, WizardPlan } from "./types";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const STORAGE_KEY = "portion_onboarding_v2";
+const STORAGE_KEY = "portion_onboarding_v3";
 
 const DAYS = ["S", "M", "T", "W", "T", "F", "S"]; // 0=Sun
 
@@ -38,6 +39,8 @@ export function OnboardingWizard({
   const [step, setStep] = useState(0);
   const [plan, setPlan] = useState<WizardPlan>(defaults);
   const [archetypeId, setArchetypeId] = useState<ArchetypeId | null>(null);
+  const [athleteKind, setAthleteKind] = useState<"endurance" | "sport">("endurance");
+  const [athleteSport, setAthleteSport] = useState("");
   const [pending, startTransition] = useTransition();
 
   // Restore from localStorage (if user refreshed mid-wizard)
@@ -45,10 +48,18 @@ export function OnboardingWizard({
     const raw = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) return;
     try {
-      const saved = JSON.parse(raw) as { archetypeId?: ArchetypeId | null; step?: number; plan?: WizardPlan };
+      const saved = JSON.parse(raw) as {
+        archetypeId?: ArchetypeId | null;
+        step?: number;
+        plan?: WizardPlan;
+        athleteKind?: "endurance" | "sport";
+        athleteSport?: string;
+      };
       if (saved.plan) setPlan(saved.plan);
       if (saved.archetypeId) setArchetypeId(saved.archetypeId);
       if (typeof saved.step === "number") setStep(Math.min(Math.max(saved.step, 0), 3));
+      if (saved.athleteKind) setAthleteKind(saved.athleteKind);
+      if (saved.athleteSport) setAthleteSport(saved.athleteSport);
     } catch {
       // ignore corrupt state
     }
@@ -57,7 +68,7 @@ export function OnboardingWizard({
   // Mirror to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ archetypeId, step, plan }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ archetypeId, step, plan, athleteKind, athleteSport }));
   }, [archetypeId, step, plan]);
 
   const updatePillar = (which: "health" | "money", patch: PillarPlan) => {
@@ -65,14 +76,27 @@ export function OnboardingWizard({
   };
 
   function selectArchetype(id: ArchetypeId) {
-    // Only reseed the plan when switching to a *different* archetype — clicking
-    // the already-selected one (e.g. after navigating Back) preserves edits.
     if (id !== archetypeId) {
-      const chosen = archetypes.find((a) => a.id === id);
-      if (chosen) setPlan(chosen.plan);
+      if (id !== "athlete") {
+        const chosen = archetypes.find((a) => a.id === id);
+        if (chosen) setPlan(chosen.plan);
+      } else {
+        setPlan(buildAthletePlan(athleteKind, athleteSport));
+      }
       setArchetypeId(id);
     }
-    setStep(1);
+    // Athlete stays on step 0 until the user fills in their sport and hits Continue.
+    if (id !== "athlete") setStep(1);
+  }
+
+  function handleAthleteKindChange(kind: "endurance" | "sport") {
+    setAthleteKind(kind);
+    if (archetypeId === "athlete") setPlan(buildAthletePlan(kind, athleteSport));
+  }
+
+  function handleAthleteSportChange(sport: string) {
+    setAthleteSport(sport);
+    if (archetypeId === "athlete") setPlan(buildAthletePlan(athleteKind, sport));
   }
 
   function next() {
@@ -168,6 +192,10 @@ export function OnboardingWizard({
                 selectedId={archetypeId}
                 onSelect={selectArchetype}
                 userName={userName}
+                athleteKind={athleteKind}
+                athleteSport={athleteSport}
+                onAthleteKindChange={handleAthleteKindChange}
+                onAthleteSportChange={handleAthleteSportChange}
               />
             </StepWrapper>
           )}
@@ -218,7 +246,7 @@ export function OnboardingWizard({
             <button
               type="button"
               onClick={next}
-              disabled={step === 0 && !archetypeId}
+              disabled={step === 0 && (!archetypeId || (archetypeId === "athlete" && !athleteSport.trim()))}
               className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-2.5 text-sm font-semibold text-black transition hover:scale-[1.02] active:scale-[0.98] disabled:opacity-30 disabled:hover:scale-100"
             >
               Continue

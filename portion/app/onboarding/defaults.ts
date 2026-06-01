@@ -1,12 +1,5 @@
 import type { WizardPlan } from "./types";
 
-// ——————————————————————————————————————————————
-// Archetype plans. Each is a complete WizardPlan weighted toward a different
-// "make-it" path. The user picks one on step 0, then edits freely. Goals are
-// filtered by non-empty title on save, and habits by `checked`.
-// ——————————————————————————————————————————————
-
-// All-In — the original full plan (Jędrek's real seed data). Everything at once.
 export const allInPlan: WizardPlan = {
   health: {
     goals: [
@@ -25,7 +18,7 @@ export const allInPlan: WizardPlan = {
       { title: "Train Lower", frequency: "WEEKLY", dayOfWeek: [6], checked: true },
       { title: "Sprint session", frequency: "WEEKLY", dayOfWeek: [3], checked: true },
       { title: "Long run", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
-      { title: "Log 4 meals (2,400 kcal · 180g protein)", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Log meals", frequency: "DAILY", dayOfWeek: [], checked: true },
       { title: "Log body weight", frequency: "DAILY", dayOfWeek: [], checked: true },
     ],
   },
@@ -41,16 +34,15 @@ export const allInPlan: WizardPlan = {
       { title: "Monthly income", currentValue: 0, targetValue: 10000, unit: "PLN/month", targetDate: null },
     ],
     habits: [
-      { title: "Ship 1 piece of content", frequency: "DAILY", dayOfWeek: [], checked: true },
-      { title: "Deep work · 2h", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Create content", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Deep work", frequency: "DAILY", dayOfWeek: [], checked: true },
       { title: "Update follower count", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
       { title: "Log weekly income", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
-      { title: "Review goal progress", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+      { title: "Review goals", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
     ],
   },
 };
 
-// The Lifter — training is the main character; income runs quietly on the side.
 export const lifterPlan: WizardPlan = {
   health: {
     goals: [
@@ -61,7 +53,7 @@ export const lifterPlan: WizardPlan = {
       { title: "Train Push", frequency: "WEEKLY", dayOfWeek: [1, 4], checked: true },
       { title: "Train Pull", frequency: "WEEKLY", dayOfWeek: [2, 5], checked: true },
       { title: "Train Legs", frequency: "WEEKLY", dayOfWeek: [3, 6], checked: true },
-      { title: "Log meals (hit protein)", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Log meals", frequency: "DAILY", dayOfWeek: [], checked: true },
       { title: "Log body weight", frequency: "DAILY", dayOfWeek: [], checked: true },
     ],
   },
@@ -71,7 +63,6 @@ export const lifterPlan: WizardPlan = {
   },
 };
 
-// The Cut-and-Build — recomp-focused: strip fat, get stronger; light money goal.
 export const cutAndBuildPlan: WizardPlan = {
   health: {
     goals: [
@@ -81,21 +72,20 @@ export const cutAndBuildPlan: WizardPlan = {
     habits: [
       { title: "Strength — Upper", frequency: "WEEKLY", dayOfWeek: [1, 4], checked: true },
       { title: "Strength — Lower", frequency: "WEEKLY", dayOfWeek: [2, 5], checked: true },
-      { title: "Conditioning / cardio", frequency: "WEEKLY", dayOfWeek: [3, 6], checked: true },
-      { title: "Log meals (track macros)", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Conditioning", frequency: "WEEKLY", dayOfWeek: [3, 6], checked: true },
+      { title: "Log meals", frequency: "DAILY", dayOfWeek: [], checked: true },
       { title: "Log body weight", frequency: "DAILY", dayOfWeek: [], checked: true },
     ],
   },
   money: {
     goals: [{ title: "Monthly income", currentValue: 0, targetValue: 5000, unit: "PLN/month", targetDate: null }],
     habits: [
-      { title: "Deep work · 1h", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Deep work", frequency: "DAILY", dayOfWeek: [], checked: true },
       { title: "Log weekly income", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
     ],
   },
 };
 
-// The Content Sprinter — grow the audience first; stay lean enough for camera.
 export const contentSprinterPlan: WizardPlan = {
   health: {
     goals: [{ title: "Stay lean", currentValue: 78, targetValue: 75, unit: "kg", targetDate: null }],
@@ -110,15 +100,14 @@ export const contentSprinterPlan: WizardPlan = {
       { title: "Content income", currentValue: 0, targetValue: 4000, unit: "PLN/month", targetDate: null },
     ],
     habits: [
-      { title: "Post 1 video", frequency: "DAILY", dayOfWeek: [], checked: true },
-      { title: "Reply / engage · 30 min", frequency: "DAILY", dayOfWeek: [], checked: true },
-      { title: "Batch-film content", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+      { title: "Post content", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Engage with audience", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Batch content", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
       { title: "Update follower count", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
     ],
   },
 };
 
-// The Side Hustler — money is the mission; the gym keeps you disciplined.
 export const sideHustlerPlan: WizardPlan = {
   health: {
     goals: [{ title: "Stay consistent in the gym", currentValue: null, targetValue: null, unit: "", targetDate: null }],
@@ -133,15 +122,80 @@ export const sideHustlerPlan: WizardPlan = {
       { title: "Paying clients", currentValue: 0, targetValue: 10, unit: "clients", targetDate: null },
     ],
     habits: [
-      { title: "Deep work · 2h", frequency: "DAILY", dayOfWeek: [], checked: true },
-      { title: "Outreach / DMs", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Deep work", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Outreach", frequency: "DAILY", dayOfWeek: [], checked: true },
       { title: "Log weekly income", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
       { title: "Review pipeline", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
     ],
   },
 };
 
-export type ArchetypeId = "lifter" | "cutAndBuild" | "contentSprinter" | "sideHustler" | "allIn";
+export const triathleteplan: WizardPlan = {
+  health: {
+    goals: [
+      { title: "Complete a race", currentValue: null, targetValue: null, unit: "", targetDate: null },
+    ],
+    habits: [
+      { title: "Swim", frequency: "WEEKLY", dayOfWeek: [1, 4], checked: true },
+      { title: "Bike", frequency: "WEEKLY", dayOfWeek: [2, 5], checked: true },
+      { title: "Run", frequency: "WEEKLY", dayOfWeek: [3, 6], checked: true },
+      { title: "Brick session", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+      { title: "Log meals", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Log body weight", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+    ],
+  },
+  money: {
+    goals: [{ title: "Monthly income", currentValue: 0, targetValue: 3000, unit: "PLN/month", targetDate: null }],
+    habits: [{ title: "Deep work", frequency: "DAILY", dayOfWeek: [], checked: true }],
+  },
+};
+
+export function buildAthletePlan(kind: "endurance" | "sport", sportName: string): WizardPlan {
+  const name = sportName.trim() || "your sport";
+  if (kind === "endurance") {
+    return {
+      health: {
+        goals: [{ title: `${name} performance`, currentValue: null, targetValue: null, unit: "", targetDate: null }],
+        habits: [
+          { title: `Train ${name}`, frequency: "WEEKLY", dayOfWeek: [1, 3, 5], checked: true },
+          { title: "Long session", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+          { title: "Strength", frequency: "WEEKLY", dayOfWeek: [2, 4], checked: true },
+          { title: "Log meals", frequency: "DAILY", dayOfWeek: [], checked: true },
+          { title: "Log body weight", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+        ],
+      },
+      money: {
+        goals: [{ title: "Monthly income", currentValue: 0, targetValue: 3000, unit: "PLN/month", targetDate: null }],
+        habits: [{ title: "Deep work", frequency: "DAILY", dayOfWeek: [], checked: true }],
+      },
+    };
+  }
+  return {
+    health: {
+      goals: [{ title: `${name} performance`, currentValue: null, targetValue: null, unit: "", targetDate: null }],
+      habits: [
+        { title: `${name} practice`, frequency: "WEEKLY", dayOfWeek: [1, 3, 5], checked: true },
+        { title: "Strength training", frequency: "WEEKLY", dayOfWeek: [2, 4], checked: true },
+        { title: "Skill work", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+        { title: "Log meals", frequency: "DAILY", dayOfWeek: [], checked: true },
+        { title: "Log body weight", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+      ],
+    },
+    money: {
+      goals: [{ title: "Monthly income", currentValue: 0, targetValue: 3000, unit: "PLN/month", targetDate: null }],
+      habits: [{ title: "Deep work", frequency: "DAILY", dayOfWeek: [], checked: true }],
+    },
+  };
+}
+
+export type ArchetypeId =
+  | "lifter"
+  | "cutAndBuild"
+  | "contentSprinter"
+  | "sideHustler"
+  | "triathlete"
+  | "athlete"
+  | "allIn";
 
 export type Archetype = {
   id: ArchetypeId;
@@ -181,6 +235,20 @@ export const ARCHETYPES: Archetype[] = [
     plan: sideHustlerPlan,
   },
   {
+    id: "triathlete",
+    name: "The Triathlete",
+    tagline: "Swim. Bike. Run. Repeat.",
+    blurb: "Three disciplines, one goal. Everything else runs lean.",
+    plan: triathleteplan,
+  },
+  {
+    id: "athlete",
+    name: "The Athlete",
+    tagline: "Train your sport. Chase your standard.",
+    blurb: "Sport-first — pick your discipline and build the plan around it.",
+    plan: buildAthletePlan("endurance", "your sport"),
+  },
+  {
     id: "allIn",
     name: "All-In",
     tagline: "Lock in across all four. No excuses.",
@@ -189,5 +257,4 @@ export const ARCHETYPES: Archetype[] = [
   },
 ];
 
-// Initial working plan before an archetype is chosen (kept for back-compat).
 export const defaultPlan: WizardPlan = allInPlan;
