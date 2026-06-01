@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 export function WeeklyReflectionForm({
@@ -14,7 +15,7 @@ export function WeeklyReflectionForm({
   const [learning, setLearning] = useState(initial?.learning ?? "");
   const [priority, setPriority] = useState(initial?.priority ?? "");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const router = useRouter();
 
   const empty = !wins.trim() && !learning.trim() && !priority.trim();
 
@@ -27,12 +28,10 @@ export function WeeklyReflectionForm({
         body: JSON.stringify({ wins, learning, priority, weekStart: weekStartISO }),
       });
       if (!res.ok) throw new Error();
-      setSaved(true);
       toast.success("Reflection saved.");
-      setTimeout(() => setSaved(false), 3000);
+      router.push("/dashboard");
     } catch {
       toast.error("Failed to save reflection.");
-    } finally {
       setSaving(false);
     }
   }
@@ -77,7 +76,7 @@ export function WeeklyReflectionForm({
         disabled={saving || empty}
         className="rounded-full bg-foreground px-6 py-2.5 text-sm font-semibold text-background transition hover:opacity-90 disabled:opacity-40"
       >
-        {saving ? "Saving…" : saved ? "Saved ✓" : "Save reflection"}
+        {saving ? "Saving…" : "Save reflection"}
       </button>
     </div>
   );
