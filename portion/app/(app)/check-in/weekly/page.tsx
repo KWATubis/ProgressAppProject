@@ -15,10 +15,17 @@ export default async function WeeklyReflectionPage() {
   const weekStart = getWeekDates(today)[0];
   const weekStartISO = weekStart.toISOString();
 
-  const existing = await prisma.weeklyReflection.findUnique({
-    where: { profileId_weekStart: { profileId: user.id, weekStart } },
-    select: { wins: true, learning: true, priority: true },
-  });
+  const [existing, history] = await Promise.all([
+    prisma.weeklyReflection.findUnique({
+      where: { profileId_weekStart: { profileId: user.id, weekStart } },
+      select: { wins: true, learning: true, priority: true },
+    }),
+    prisma.weeklyReflection.findMany({
+      where: { profileId: user.id, weekStart: { lt: weekStart } },
+      orderBy: { weekStart: "desc" },
+      select: { weekStart: true, wins: true, learning: true, priority: true },
+    }),
+  ]);
 
   const weekLabel = weekStart.toLocaleDateString(undefined, { month: "long", day: "numeric" });
   const isSunday = today.getUTCDay() === 0;
@@ -50,10 +57,47 @@ export default async function WeeklyReflectionPage() {
 
       <WeeklyReflectionForm weekStartISO={weekStartISO} initial={existing ?? null} />
 
-      {existing && (
-        <p className="text-xs text-muted-foreground">
-          Last saved: {formatISODate(today)} — editing updates the existing entry.
-        </p>
+      {history.length > 0 && (
+        <section className="space-y-4 border-t border-border pt-8">
+          <h2 className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
+            Past reflections
+          </h2>
+          <div className="space-y-4">
+            {history.map((r) => {
+              const label = r.weekStart.toLocaleDateString(undefined, {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              });
+              return (
+                <div
+                  key={formatISODate(r.weekStart)}
+                  className="rounded-xl border border-border bg-card/50 p-5 space-y-4"
+                >
+                  <p className="text-xs font-medium text-muted-foreground">Week of {label}</p>
+                  {r.wins && (
+                    <div>
+                      <p className="mb-1 text-[11px] uppercase tracking-wider text-muted-foreground">🏆 Wins</p>
+                      <p className="text-sm whitespace-pre-wrap">{r.wins}</p>
+                    </div>
+                  )}
+                  {r.learning && (
+                    <div>
+                      <p className="mb-1 text-[11px] uppercase tracking-wider text-muted-foreground">📚 Learned</p>
+                      <p className="text-sm whitespace-pre-wrap">{r.learning}</p>
+                    </div>
+                  )}
+                  {r.priority && (
+                    <div>
+                      <p className="mb-1 text-[11px] uppercase tracking-wider text-muted-foreground">🎯 Priority set</p>
+                      <p className="text-sm font-medium">{r.priority}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
     </div>
   );
