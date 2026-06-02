@@ -52,8 +52,6 @@ export interface HolographicMaterialParams {
   headFadeHi?: number; // world-Y where the head glow damp reaches full
   headGlow?: number; // rim+seam multiplier on the head (lower = dimmer head)
   headFill?: number; // surface-fill multiplier on the head
-  handGlow?: number; // rim+seam multiplier on the hands (lower = calmer hands)
-  handFill?: number; // surface-fill multiplier on the hands
   stateMix?: number; // 0 = ignore muscle-state colour (pure cyan), 1 = fully tint by state
   stateWash?: number; // even, structure-independent fill of the recovery colour (consistency)
 }
@@ -78,14 +76,12 @@ export class HolographicMaterial extends ShaderMaterial {
       varying vec3 vStateColor;
       varying float vHasState;
       varying float vSelected;
-      varying float vHand;
 
       attribute float aCrease;
       attribute float aForm;
       attribute vec3 aStateColor;
       attribute float aHasState;
       attribute float aSelected;
-      attribute float aHand;
 
       #include <common>
       #include <uv_pars_vertex>
@@ -124,7 +120,6 @@ export class HolographicMaterial extends ShaderMaterial {
         vStateColor = aStateColor;
         vHasState = aHasState;
         vSelected = aSelected;
-        vHand = aHand;
         vPos = projectionMatrix * modelViewMatrix * vec4( transformed, 1.0 );
         vPositionW = vec3( vec4( transformed, 1.0 ) * modelMatrix );
         vWorldY = ( modelMatrix * vec4( transformed, 1.0 ) ).y;
@@ -144,7 +139,6 @@ export class HolographicMaterial extends ShaderMaterial {
       varying vec3 vStateColor;
       varying float vHasState;
       varying float vSelected;
-      varying float vHand;
 
       uniform float time;
       uniform float fresnelOpacity;
@@ -176,8 +170,6 @@ export class HolographicMaterial extends ShaderMaterial {
       uniform float headFadeHi;
       uniform float headGlow;
       uniform float headFill;
-      uniform float handGlow;
-      uniform float handFill;
       uniform float stateMix;
       uniform float stateWash;
 
@@ -253,15 +245,9 @@ export class HolographicMaterial extends ShaderMaterial {
         // shins. Keep it full from the knee up (quad definition), kill it on the
         // calves/shins below.
         float calfMask = smoothstep(creaseCalfLo, creaseCalfHi, vWorldY);
-        // Calm the dense hand mesh: the fingers concentrate the rim/seam glow and
-        // speckle the fill, so damp them toward a smooth, dim continuation of the
-        // forearm. (The recovery wash is already absent — hands are left
-        // untracked, so vHasState = 0 there.)
-        float handMask = clamp(vHand, 0.0, 1.0);
-        float handDamp = mix(1.0, handGlow, handMask);
-        rim        *= footFade * headDamp * handDamp;
-        seamGlow   *= footFade * headDamp * legMask * calfMask * handDamp;
-        shadedFill *= footFade * mix(1.0, headFill, headK) * mix(1.0, handFill, handMask);
+        rim        *= footFade * headDamp;
+        seamGlow   *= footFade * headDamp * legMask * calfMask;
+        shadedFill *= footFade * mix(1.0, headFill, headK);
 
         vec3 finalColor;
         if (blinkFresnelOnly) {
@@ -330,8 +316,6 @@ export class HolographicMaterial extends ShaderMaterial {
       headFadeHi: new Uniform(parameters.headFadeHi ?? 1.8),
       headGlow: new Uniform(parameters.headGlow ?? 0.28),
       headFill: new Uniform(parameters.headFill ?? 0.5),
-      handGlow: new Uniform(parameters.handGlow ?? 0.5),
-      handFill: new Uniform(parameters.handFill ?? 0.7),
       stateMix: new Uniform(parameters.stateMix ?? 0.85),
       stateWash: new Uniform(parameters.stateWash ?? 0.45),
     };

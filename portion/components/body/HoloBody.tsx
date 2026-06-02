@@ -39,14 +39,17 @@ const LEG_DEFINE = 0.026;
 const LEG_SLIM = 0.006;
 const CALF_SLIM = 0.011;
 
-// ---- Hand region (shared by the smoothing pass + the shader's aHand mask) and
-// how hard the crumpled finger mesh is relaxed into a smooth, rounded hand.
-const HAND_FORM_MAX = 0.35; // aForm below this = fine detail (the finger mesh)
-const HAND_X_FRAC = 0.25; // |x| past this fraction of half-width = out on the arm
-const HAND_Y_LO = 0.35; // hand height band, normalised (0 feet → 1 head)
-const HAND_Y_HI = 0.74;
-const HAND_SMOOTH_ITERS = 12; // Laplacian passes over the hand verts
-const HAND_SMOOTH_STRENGTH = 0.6; // 0 = none … 1 = full move to neighbour average per pass
+// ---- Hand removal. The model's hands/fingers are a dense, glitchy cluster of
+// triangles; reshaping, fading and "calming" them all failed. So we physically
+// DELETE the hand triangles — gone from the surface, wireframe AND depth pass at
+// once, because there's no geometry left to render. The cut is MEASURED from the
+// model, not guessed: in its native T-pose the arms lie along X and a density
+// histogram of |x|/half-span is sparse all down the arm (~30 verts/bin) then
+// jumps ~20× at ≈0.74 — that spike is the wrist→hand. So we slice there. This
+// MUST run in T-pose, before poseArms swings the arms down: once posed, the
+// hands leave the X-extreme, which is why every earlier posed-space attempt
+// missed them entirely.
+const WRIST_FRAC = 0.72; // |x - centre| / halfSpan beyond this = hand → deleted; LOWER to take more arm
 
 // ---- Wireframe-overlay height fade.
 const WIRE_FOOT_LO = 0.0;
@@ -54,7 +57,6 @@ const WIRE_FOOT_HI = 0.13;
 const WIRE_HEAD_LO = 1.64;
 const WIRE_HEAD_HI = 1.82;
 const WIRE_HEAD_GLOW = 0.28;
-const WIRE_HAND_GLOW = 0.4; // dim the dense hand-mesh wireframe so it reads as a clean hand, not a tangle
 
 const TARGET_HEIGHT = 2.0;
 
@@ -88,20 +90,24 @@ const GI = {
 } as const satisfies Record<MuscleGroup, number>;
 
 function classifyMuscle(yN: number, xN: number, zRel: number): number {
-  // Arms sit well outside the torso once abducted.
+  // --- Arms (abducted, hanging at the sides; xN large = away from centreline).
+  // Split the arm by height: deltoid cap (top) → upper arm → forearm. The hands
+  // are already deleted from the mesh, so the lowest band is the forearm→wrist
+  // stub. Tune: armShoulder 0.65 (lower if no delt shows), armElbow 0.60 (raise
+  // to grow the forearm / shrink the upper arm).
   if (xN > 0.52) {
-    if (yN >= 0.58) return zRel >= 0 ? GI.biceps : GI.triceps; // upper arm
-    if (yN >= 0.46) return GI.forearms;
-    return -1; // hand
+    if (yN >= 0.73) return GI.shoulders; // deltoid cap — thin top sliver only
+    if (yN >= 0.66) return zRel >= 0 ? GI.biceps : GI.triceps; // upper arm
+    if (yN >= 0.5) return GI.forearms; // forearm; floor keeps the focus centroid off the legs
+    return -1; // below the wrist (hands deleted) — drop strays so they can't sink the camera
   }
-  // Central column (torso + legs).
+  // --- Central column (torso + legs). front = +z.
   if (yN > 0.8) return -1; // head / neck
-  if (yN > 0.62) {
-    if (xN > 0.36) return GI.shoulders; // deltoid caps
-    return zRel >= 0 ? GI.chest : GI.back;
-  }
-  if (yN > 0.5) return zRel >= 0 ? GI.abs : GI.back;
-  if (yN > 0.45) return zRel >= 0 ? GI.abs : GI.glutes; // hips / glutes
+  if (yN > 0.7 && xN > 0.36) return GI.shoulders; // deltoid / trap cap — top only
+  if (yN > 0.7) return zRel >= 0 ? GI.chest : GI.back; // chest / upper back
+  if (yN > 0.56) return zRel >= 0 ? GI.abs : GI.back; // abs / lats (mid back)
+  if (yN > 0.54) return zRel >= 0 ? GI.abs : GI.glutes; // lower abs / glute top
+  if (yN > 0.45) return zRel >= 0 ? GI.quads : GI.glutes; // hip: thigh top / glutes
   if (yN > 0.25) return zRel >= 0 ? GI.quads : GI.hamstrings; // thigh
   if (yN > 0.08) return GI.calves; // lower leg
   return -1; // feet
@@ -488,69 +494,6 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
     sm = concavity(cx, cy, cz, nrm.nx, nrm.ny, nrm.nz);
   }
 
-  // ---- Relax the hands. The model's hand is a dense, crumpled low-poly mesh
-  // with splayed fingers; as a translucent wireframe hologram that reads as a
-  // mangled blob. Laplacian-smooth ONLY the hand verts (same density + mid-body
-  // height + lateral test as the shader's aHand mask) toward their neighbour
-  // average. The surrounding wrist verts stay anchored, so the splayed fingers
-  // collapse and round into a smooth, closed hand that blends into the forearm.
-  // Reuses the welded canonical verts + adjacency already built above.
-  {
-    const minY = bb.min.y;
-    const centerX = (bb.min.x + bb.max.x) * 0.5;
-    const halfWidth = Math.max((bb.max.x - bb.min.x) * 0.5, 1e-4);
-    const isHand = new Uint8Array(M);
-    let handN = 0;
-    for (let i = 0; i < M; i++) {
-      const yN = (cy[i] - minY) / height;
-      const xN = Math.abs(cx[i] - centerX) / halfWidth;
-      if (formMask[i] < HAND_FORM_MAX && yN > HAND_Y_LO && yN < HAND_Y_HI && xN > HAND_X_FRAC) {
-        isHand[i] = 1;
-        handN++;
-      }
-    }
-    if (handN >= 30) {
-      const tx = new Float32Array(M);
-      const ty = new Float32Array(M);
-      const tz = new Float32Array(M);
-      for (let pass = 0; pass < HAND_SMOOTH_ITERS; pass++) {
-        for (let i = 0; i < M; i++) {
-          const ns = adj[i];
-          if (!isHand[i] || ns.size === 0) {
-            tx[i] = cx[i];
-            ty[i] = cy[i];
-            tz[i] = cz[i];
-            continue;
-          }
-          let sx = 0,
-            sy = 0,
-            sz = 0;
-          for (const j of ns) {
-            sx += cx[j];
-            sy += cy[j];
-            sz += cz[j];
-          }
-          const inv = 1 / ns.size;
-          tx[i] = cx[i] + (sx * inv - cx[i]) * HAND_SMOOTH_STRENGTH;
-          ty[i] = cy[i] + (sy * inv - cy[i]) * HAND_SMOOTH_STRENGTH;
-          tz[i] = cz[i] + (sz * inv - cz[i]) * HAND_SMOOTH_STRENGTH;
-        }
-        for (let i = 0; i < M; i++) {
-          cx[i] = tx[i];
-          cy[i] = ty[i];
-          cz[i] = tz[i];
-        }
-      }
-      for (let i = 0; i < N; i++) {
-        const c = orig2canon[i];
-        posAttr.setXYZ(i, cx[c], cy[c], cz[c]);
-      }
-      posAttr.needsUpdate = true;
-      nrm = computeNormals(cx, cy, cz);
-      sm = concavity(cx, cy, cz, nrm.nx, nrm.ny, nrm.nz);
-    }
-  }
-
   const sorted = Float32Array.from(sm).sort();
   const lo = sorted[Math.max(0, Math.floor(M * 0.02))];
   const hi = sorted[Math.min(M - 1, Math.floor(M * 0.98))];
@@ -569,51 +512,223 @@ function enhanceMuscles(geo: THREE.BufferGeometry, inflate = 0.011) {
 }
 
 // ---------------------------------------------------------------------------
-// markHands — flag the hand/finger vertices WITHOUT deleting them. In the
-// settled A-pose the hands rest out beyond the hips at roughly 0.5–0.7·h as the
-// model's most finely tessellated geometry. Rendered as a translucent hologram
-// that dense finger mesh otherwise glitches two ways: (a) the muscle classifier
-// mistakes it for forearm/biceps and washes it with the recovery colour — the
-// bright GREEN blob — and (b) its tiny triangles pile the rim/seam glow + the
-// wireframe into a busy tangle. So we keep the hands but bake a per-vertex
-// `aHand` mask: the classifier leaves those verts untracked (plain cyan, no
-// wash, like the head/feet) and the shader + wireframe damp the glow on them, so
-// each hand reads as a smooth, dim continuation of the forearm instead of a
-// glitch. Detected by three cheap, model-agnostic signals:
-//   • density   — the baked `aForm` mask is ~0 on fine detail, so the smooth
-//                 forearm cylinder is excluded and only the fingers qualify;
-//   • height    — a mid-body band that excludes the feet and the dense skull;
-//   • laterality — |x| out toward the arms, excluding any central face verts.
-// Runs after enhanceMuscles (which bakes aForm) and before classification so the
-// mask is ready downstream. Always writes `aHand` (all-zero on non-hand meshes)
-// so the shader attribute is present on every geometry.
+// deleteHands — physically remove the hand triangles and cap each wrist with a
+// rounded dome. In the model's native T-pose the arms lie along X and the hands
+// are the dense vertex clusters at the far ends, so a triangle is a hand
+// triangle when all 3 of its corners sit past WRIST_FRAC of the half-span. After
+// dropping those, the arm ends in an open tube; we find that opening (the
+// boundary edges whose endpoints are both former-hand verts) and fan it to a
+// single apex pushed out along the arm, so the wrist reads as a rounded stub
+// instead of a hollow pipe. MUST run before poseArms (hands still at X-extreme).
 // ---------------------------------------------------------------------------
-function markHands(
-  geo: THREE.BufferGeometry,
-  { formThreshold = HAND_FORM_MAX, xFrac = HAND_X_FRAC, yLo = HAND_Y_LO, yHi = HAND_Y_HI } = {},
-) {
-  if (geo.userData.handsMarked) return;
-  const pos = geo.attributes.position;
-  const N = pos.count;
-  if (!N) return;
+function deleteHands(meshes: THREE.Mesh[]) {
+  if (meshes.length === 0) return;
+  // Combined world box. Arm-span axis is X (matches poseArms); the hands are the
+  // X-extremes of this T-pose. matrixWorld is ~identity here (poseArms relies on
+  // that too), so local ≈ world.
+  const box = new THREE.Box3();
+  for (const m of meshes) box.expandByObject(m);
+  const size = new THREE.Vector3();
+  const center = new THREE.Vector3();
+  box.getSize(size);
+  box.getCenter(center);
+  const halfX = Math.max(size.x * 0.5, 1e-4);
+  const diag = size.length() || 1;
 
-  const hand = new Float32Array(N); // 0 everywhere by default
-  const form = geo.getAttribute("aForm") as THREE.BufferAttribute | undefined;
-  if (form) {
-    geo.computeBoundingBox();
-    const bb = geo.boundingBox!;
-    const minY = bb.min.y;
-    const height = bb.max.y - bb.min.y || 1;
-    const centerX = (bb.min.x + bb.max.x) * 0.5;
-    const halfWidth = Math.max((bb.max.x - bb.min.x) * 0.5, 1e-4);
+  const wv = new THREE.Vector3();
+  const p0 = new THREE.Vector3();
+  const p1 = new THREE.Vector3();
+  const pa = new THREE.Vector3();
+  const eA = new THREE.Vector3();
+  const eB = new THREE.Vector3();
+  const nrm = new THREE.Vector3();
+
+  for (const mesh of meshes) {
+    const geo = mesh.geometry;
+    if (geo.userData.handsTrimmed) continue;
+
+    // Skip meshes with no hand verts (eyes, etc.) before any heavier work.
+    const pos0 = geo.attributes.position;
+    if (!pos0?.count) continue;
+    let anyHand = false;
+    for (let i = 0; i < pos0.count; i++) {
+      wv.set(pos0.getX(i), pos0.getY(i), pos0.getZ(i)).applyMatrix4(mesh.matrixWorld);
+      if (Math.abs(wv.x - center.x) / halfX > WRIST_FRAC) {
+        anyHand = true;
+        break;
+      }
+    }
+    if (!anyHand) continue;
+    geo.userData.handsTrimmed = true;
+
+    // Work on a non-indexed soup so one path handles everything and welding by
+    // position (to find shared edges) is straightforward.
+    const src = geo.index ? geo.toNonIndexed() : geo;
+    const pos = src.attributes.position;
+    const N = pos.count;
+    const names = Object.keys(src.attributes);
+
+    const isHand = new Uint8Array(N);
     for (let i = 0; i < N; i++) {
-      const yN = (pos.getY(i) - minY) / height;
-      const xN = Math.abs(pos.getX(i) - centerX) / halfWidth; // 0 centreline → ~1 arm tip
-      if (yN > yLo && yN < yHi && xN > xFrac && form.getX(i) < formThreshold) hand[i] = 1;
+      wv.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(mesh.matrixWorld);
+      if (Math.abs(wv.x - center.x) / halfX > WRIST_FRAC) isHand[i] = 1;
+    }
+
+    // Keep every triangle that isn't entirely hand.
+    const triCount = Math.floor(N / 3);
+    const kept: number[] = []; // start index (t*3) of each kept triangle
+    for (let t = 0; t < triCount; t++) {
+      const a = t * 3;
+      if (isHand[a] && isHand[a + 1] && isHand[a + 2]) continue;
+      kept.push(a);
+    }
+
+    // Weld by quantised position so shared edges match across the soup.
+    const q = 1 / (diag * 1e-5);
+    const canon = new Map<string, number>();
+    const canonId = new Int32Array(N);
+    for (let i = 0; i < N; i++) {
+      const k = `${Math.round(pos.getX(i) * q)}|${Math.round(pos.getY(i) * q)}|${Math.round(pos.getZ(i) * q)}`;
+      const c = canon.get(k);
+      if (c === undefined) {
+        canon.set(k, i);
+        canonId[i] = i;
+      } else {
+        canonId[i] = c;
+      }
+    }
+
+    // Count undirected edges over the kept triangles.
+    const edgeCount = new Map<string, number>();
+    const addEdge = (u: number, v: number) => {
+      if (u === v) return;
+      const k = u < v ? `${u}_${v}` : `${v}_${u}`;
+      edgeCount.set(k, (edgeCount.get(k) ?? 0) + 1);
+    };
+    for (const a of kept) {
+      const ca = canonId[a],
+        cb = canonId[a + 1],
+        cc = canonId[a + 2];
+      addEdge(ca, cb);
+      addEdge(cb, cc);
+      addEdge(cc, ca);
+    }
+
+    // Wrist rim = boundary edges (used once) whose endpoints are both hand verts.
+    // Split into the two arms by the sign of x relative to centre.
+    const rimSides: Array<Array<[number, number]>> = [[], []]; // 0 = +x, 1 = −x
+    for (const [k, cnt] of edgeCount) {
+      if (cnt !== 1) continue;
+      const us = k.indexOf("_");
+      const u = Number(k.slice(0, us));
+      const v = Number(k.slice(us + 1));
+      if (!isHand[u] || !isHand[v]) continue;
+      const mx = (pos.getX(u) + pos.getX(v)) * 0.5;
+      rimSides[mx >= center.x ? 0 : 1].push([u, v]);
+    }
+
+    // Rebuild: kept triangles, then a dome cap per side.
+    const out: Record<string, number[]> = {};
+    for (const n of names) out[n] = [];
+    const pushVert = (i: number) => {
+      for (const n of names) {
+        const at = src.attributes[n];
+        for (let k = 0; k < at.itemSize; k++) out[n].push(at.getComponent(i, k));
+      }
+    };
+    for (const a of kept) {
+      pushVert(a);
+      pushVert(a + 1);
+      pushVert(a + 2);
+    }
+
+    for (let s = 0; s < 2; s++) {
+      const edges = rimSides[s];
+      if (edges.length < 3) continue;
+      const rim = new Set<number>();
+      for (const [u, v] of edges) {
+        rim.add(u);
+        rim.add(v);
+      }
+      let cx = 0,
+        cy = 0,
+        cz = 0;
+      for (const r of rim) {
+        cx += pos.getX(r);
+        cy += pos.getY(r);
+        cz += pos.getZ(r);
+      }
+      const rn = rim.size;
+      cx /= rn;
+      cy /= rn;
+      cz /= rn;
+      let rad = 0;
+      for (const r of rim) rad += Math.hypot(pos.getY(r) - cy, pos.getZ(r) - cz);
+      rad /= rn;
+      const sideSign = s === 0 ? 1 : -1;
+      // Apex pushed out along the arm axis → a gentle dome (not a flat disc, not
+      // a sharp cone). Lower the 0.65 for a flatter cap, raise it for a longer one.
+      pa.set(cx + sideSign * rad * 0.65, cy, cz);
+
+      // Apex template: a rim vert's attributes with the position overridden.
+      const tmpl = edges[0][0];
+      const apex: Record<string, number[]> = {};
+      for (const n of names) {
+        const at = src.attributes[n];
+        const comps: number[] = [];
+        for (let k = 0; k < at.itemSize; k++) comps.push(at.getComponent(tmpl, k));
+        apex[n] = comps;
+      }
+      apex.position = [pa.x, pa.y, pa.z];
+      const pushApex = () => {
+        for (const n of names) for (const val of apex[n]) out[n].push(val);
+      };
+
+      for (const [u, v] of edges) {
+        // Wind the cap triangle so its normal faces outward (+sideSign·x), else
+        // FrontSide culls it and the wrist still looks open.
+        let v0 = u,
+          v1 = v;
+        p0.set(pos.getX(v0), pos.getY(v0), pos.getZ(v0));
+        p1.set(pos.getX(v1), pos.getY(v1), pos.getZ(v1));
+        nrm.crossVectors(eA.subVectors(p1, p0), eB.subVectors(pa, p0));
+        if (nrm.x * sideSign < 0) {
+          v0 = v;
+          v1 = u;
+        }
+        pushVert(v0);
+        pushVert(v1);
+        pushApex();
+      }
+    }
+
+    for (const n of names) {
+      const at = src.attributes[n];
+      geo.setAttribute(n, new THREE.BufferAttribute(new Float32Array(out[n]), at.itemSize));
+    }
+    geo.setIndex(null);
+    geo.computeVertexNormals();
+  }
+}
+
+// Position-only copy of `src` for the depth pre-pass — the holo surface is drawn
+// with its full attribute set, but the depth pass only needs positions to lay
+// down z. The hand is already deleted from `src`, so this inherits the trim.
+function positionOnlyGeometry(src: THREE.BufferGeometry): THREE.BufferGeometry {
+  const pos = src.attributes.position;
+  const index = src.index;
+  const triCount = Math.floor((index ? index.count : pos.count) / 3);
+  const vAt = (t: number, c: number) => (index ? index.getX(t * 3 + c) : t * 3 + c);
+  const out: number[] = [];
+  for (let t = 0; t < triCount; t++) {
+    for (let c = 0; c < 3; c++) {
+      const vi = vAt(t, c);
+      out.push(pos.getX(vi), pos.getY(vi), pos.getZ(vi));
     }
   }
-  geo.setAttribute("aHand", new THREE.BufferAttribute(hand, 1));
-  geo.userData.handsMarked = true;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(out), 3));
+  return g;
 }
 
 // Per-muscle focus info the camera + body-rotation use to frame a clicked
@@ -674,6 +789,9 @@ export function HoloBody({
         meshes.push(m);
       });
 
+      // Cut the hands off at the wrist FIRST, in T-pose — once poseArms swings
+      // the arms down the hands leave the X-extreme and can't be found this way.
+      deleteHands(meshes);
       poseArms(meshes);
       let bodyMesh = meshes[0];
       for (const m of meshes) {
@@ -685,7 +803,6 @@ export function HoloBody({
       }
       if (bodyMesh) trimInteriorHeadCavities(bodyMesh.geometry);
       for (const m of meshes) enhanceMuscles(m.geometry);
-      for (const m of meshes) markHands(m.geometry);
 
       const holoMaterial = new HolographicMaterial({
         hologramColor: "#5be3ff",
@@ -718,8 +835,6 @@ export function HoloBody({
         headFadeHi: 1.8,
         headGlow: 0.28,
         headFill: 0.5,
-        handGlow: 0.5,
-        handFill: 0.7,
         stateMix: 0.9,
         stateWash: 0.45,
       });
@@ -772,7 +887,6 @@ export function HoloBody({
         const pos = geo.attributes.position;
         const vc = pos.count;
         const full = groupM.clone().multiply(m.matrixWorld);
-        const handAttr = geo.getAttribute("aHand") as THREE.BufferAttribute | undefined;
         const groupIndex = new Int8Array(vc);
         const hasState = new Float32Array(vc);
         const stateColor = new Float32Array(vc * 3); // cyan until first paint
@@ -781,11 +895,7 @@ export function HoloBody({
           wv.set(pos.getX(i), pos.getY(i), pos.getZ(i)).applyMatrix4(full);
           const yN = wv.y / TARGET_HEIGHT;
           const xN = Math.abs(wv.x) / fittedHalfWidth;
-          // Hands are kept but left UNTRACKED: classifying them as forearm/biceps
-          // washed the dense finger mesh with the recovery colour (the green blob).
-          // aHand (baked in markHands) forces those verts back to plain cyan.
-          const gi =
-            handAttr && handAttr.getX(i) > 0.5 ? -1 : classifyMuscle(yN, xN, wv.z);
+          const gi = classifyMuscle(yN, xN, wv.z);
           groupIndex[i] = gi;
           if (gi >= 0) {
             cSum[gi * 3] += wv.x;
@@ -816,36 +926,18 @@ export function HoloBody({
 
       const wireV = new THREE.Vector3();
       const wireOverlays = meshes.map((m) => {
+        // The hand triangles are already deleted from m.geometry, so the
+        // wireframe inherits the trim — no per-line hand damping needed.
         const geometry = new THREE.WireframeGeometry(m.geometry);
         const full = groupM.clone().multiply(m.matrixWorld);
-        // WireframeGeometry drops custom attributes but copies vertex positions
-        // verbatim, so build a quantised position → hand lookup from the source
-        // mesh to damp the wireframe on the dense hand mesh too.
-        const srcPos = m.geometry.attributes.position;
-        const srcHand = m.geometry.getAttribute("aHand") as THREE.BufferAttribute | undefined;
-        m.geometry.computeBoundingBox();
-        const mbb = m.geometry.boundingBox!;
-        const q = 1 / ((mbb.min.distanceTo(mbb.max) || 1) * 1e-5);
-        const keyOf = (x: number, y: number, z: number) =>
-          `${Math.round(x * q)}|${Math.round(y * q)}|${Math.round(z * q)}`;
-        const handKeys = new Set<string>();
-        if (srcHand) {
-          for (let i = 0; i < srcPos.count; i++)
-            if (srcHand.getX(i) > 0.5)
-              handKeys.add(keyOf(srcPos.getX(i), srcPos.getY(i), srcPos.getZ(i)));
-        }
         const wp = geometry.attributes.position;
         const colors = new Float32Array(wp.count * 3);
         for (let i = 0; i < wp.count; i++) {
-          const lx = wp.getX(i),
-            ly = wp.getY(i),
-            lz = wp.getZ(i);
-          wireV.set(lx, ly, lz).applyMatrix4(full);
+          wireV.set(wp.getX(i), wp.getY(i), wp.getZ(i)).applyMatrix4(full);
           const footFade = smoothstep(WIRE_FOOT_LO, WIRE_FOOT_HI, wireV.y);
           const headK = smoothstep(WIRE_HEAD_LO, WIRE_HEAD_HI, wireV.y);
           const headDamp = 1 + (WIRE_HEAD_GLOW - 1) * headK;
-          const handDamp = handKeys.has(keyOf(lx, ly, lz)) ? WIRE_HAND_GLOW : 1;
-          const f = footFade * headDamp * handDamp;
+          const f = footFade * headDamp;
           colors[i * 3] = f;
           colors[i * 3 + 1] = f;
           colors[i * 3 + 2] = f;
@@ -855,7 +947,7 @@ export function HoloBody({
       });
 
       const depthOverlays = meshes.map((m) => ({
-        geometry: m.geometry,
+        geometry: positionOnlyGeometry(m.geometry),
         matrix: m.matrixWorld.clone(),
       }));
 
