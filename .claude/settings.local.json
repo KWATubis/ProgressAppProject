@@ -300,7 +300,10 @@
       "PowerShell($conns = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { \"PORT 3000 IN USE by PID\\(s\\): \" + \\($conns.OwningProcess -join ', '\\); $conns.OwningProcess | Select-Object -Unique | ForEach-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue | Select-Object Id, ProcessName, StartTime } } else { \"Port 3000 is free.\" })",
       "PowerShell(curl.exe -s -o NUL -w \"HTTP %{http_code} -> %{redirect_url}`n\" \"http://localhost:3000/health\")",
       "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location portion; npx tsc --noEmit)",
-      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; npx tsc --noEmit; if \\($?\\) { Write-Output \"--- tsc clean; linting body files ---\"; npx eslint components/body/HoloBody.tsx components/body/HolographicMaterial.ts })"
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; npx tsc --noEmit; if \\($?\\) { Write-Output \"--- tsc clean; linting body files ---\"; npx eslint components/body/HoloBody.tsx components/body/HolographicMaterial.ts })",
+      "Bash(curl.exe -s -o NUL -w \"landing: %{http_code}\\\\n\" http://localhost:3000/)",
+      "Bash(curl.exe -s -o NUL -w \"dashboard: %{http_code}\\\\n\" http://localhost:3000/dashboard)",
+      "Bash(curl.exe -s -o NUL -w '%{http_code}' http://localhost:3000/__TRACKED_VAR__)"
     ]
   }
 }
