@@ -13,6 +13,8 @@ import { isTaskScheduledOn } from "@/lib/utils/tasks";
 import { TaskCalendarView, type WeekDay } from "@/components/tasks/TaskCalendarView";
 import { AddTaskDialog } from "@/components/tasks/AddTaskDialog";
 import type { CalendarTask } from "@/components/tasks/TaskCard";
+import { PageHeading } from "@/components/layout/PageHeading";
+import { Reveal } from "@/components/motion/Reveal";
 
 const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -116,24 +118,26 @@ export default async function TasksPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
-          <p className="text-sm text-muted-foreground">
+      <PageHeading
+        title="Tasks"
+        description={
+          <>
             Your week at a glance. {tasks.length} active{" "}
             {tasks.length === 1 ? "task" : "tasks"}.
-          </p>
-        </div>
-        <AddTaskDialog />
-      </div>
-
-      <TaskCalendarView
-        days={days}
-        weekLabel={weekLabel}
-        prevWeek={prevWeek}
-        nextWeek={nextWeek}
-        currentWeek={currentWeek}
+          </>
+        }
+        action={<AddTaskDialog />}
       />
+
+      <Reveal delay={0.08}>
+        <TaskCalendarView
+          days={days}
+          weekLabel={weekLabel}
+          prevWeek={prevWeek}
+          nextWeek={nextWeek}
+          currentWeek={currentWeek}
+        />
+      </Reveal>
     </div>
   );
 }

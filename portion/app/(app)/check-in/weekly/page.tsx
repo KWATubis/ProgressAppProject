@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, getWeekDates, formatISODate } from "@/lib/utils/dates";
 import { WeeklyReflectionForm } from "@/components/checkin/WeeklyReflectionForm";
+import { PageHeading } from "@/components/layout/PageHeading";
+import { Stagger } from "@/components/motion/Stagger";
 
 export default async function WeeklyReflectionPage() {
   const supabase = await createClient();
@@ -40,17 +42,22 @@ export default async function WeeklyReflectionPage() {
           <ArrowLeft className="h-4 w-4" />
           Check-in
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Weekly reflection</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Week of {weekLabel}
-          {isSunday && (
-            <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-500">
-              Today — good time for this
-            </span>
-          )}
-        </p>
+        <PageHeading
+          title="Weekly reflection"
+          description={
+            <>
+              Week of {weekLabel}
+              {isSunday && (
+                <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-500">
+                  Today — good time for this
+                </span>
+              )}
+            </>
+          }
+        />
       </div>
 
+      <Stagger className="space-y-8" delay={0.08}>
       <p className="text-sm text-muted-foreground">
         5 minutes. Three questions. Keeps you from running blind.
       </p>
@@ -99,6 +106,7 @@ export default async function WeeklyReflectionPage() {
           </div>
         </section>
       )}
+      </Stagger>
     </div>
   );
 }

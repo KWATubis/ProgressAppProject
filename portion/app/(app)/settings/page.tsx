@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { LogOut, User } from "lucide-react";
+import { PageHeading } from "@/components/layout/PageHeading";
+import { Stagger } from "@/components/motion/Stagger";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -27,11 +29,9 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your account</p>
-      </div>
+      <PageHeading title="Settings" description="Manage your account" />
 
+      <Stagger className="space-y-8" delay={0.08}>
       <section className="rounded-xl border border-border bg-card p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent">
@@ -62,6 +62,7 @@ export default async function SettingsPage() {
           </Button>
         </form>
       </section>
+      </Stagger>
     </div>
   );
 }

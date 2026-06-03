@@ -7,6 +7,8 @@ import {
   type CustomMetricOption,
 } from "@/components/goals/GoalsManager";
 import { withDerivedCurrent } from "@/lib/goalMetrics.server";
+import { PageHeading } from "@/components/layout/PageHeading";
+import { Reveal } from "@/components/motion/Reveal";
 
 export default async function GoalsPage() {
   const supabase = await createClient();
@@ -55,14 +57,14 @@ export default async function GoalsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Goals</h1>
-        <p className="text-sm text-muted-foreground">
-          Add, edit, or archive the goals driving your Health and Money pillars.
-        </p>
-      </div>
+      <PageHeading
+        title="Goals"
+        description="Add, edit, or archive the goals driving your Health and Money pillars."
+      />
 
-      <GoalsManager initialGoals={views} customMetrics={customMetrics} />
+      <Reveal delay={0.08}>
+        <GoalsManager initialGoals={views} customMetrics={customMetrics} />
+      </Reveal>
     </div>
   );
 }

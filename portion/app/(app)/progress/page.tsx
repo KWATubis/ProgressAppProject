@@ -12,6 +12,8 @@ import { IncomeChart, type IncomeMonth } from "@/components/charts/IncomeChart";
 import { BusinessMetricsChart, type BusinessMetricPoint } from "@/components/charts/BusinessMetricsChart";
 import { TotalProgressChart, type ProgressPoint } from "@/components/charts/TotalProgressChart";
 import { RangeSelector, type Range } from "./RangeSelector";
+import { PageHeading } from "@/components/layout/PageHeading";
+import { Reveal } from "@/components/motion/Reveal";
 
 const RANGE_DAYS: Record<Range, number | null> = {
   "7d": 7,
@@ -273,15 +275,14 @@ export default async function ProgressPage({
   return (
     <div className="mx-auto max-w-5xl space-y-10">
       {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
-          <p className="text-sm text-muted-foreground">All your charts in one place.</p>
-        </div>
-        <RangeSelector current={range} />
-      </div>
+      <PageHeading
+        title="Progress"
+        description="All your charts in one place."
+        action={<RangeSelector current={range} />}
+      />
 
       {/* Total progress */}
+      <Reveal delay={0.08}>
       <section className="space-y-3">
         <div>
           <p className="text-sm font-semibold">Total Progress</p>
@@ -293,6 +294,7 @@ export default async function ProgressPage({
         </div>
         <TotalProgressChart data={progressData} />
       </section>
+      </Reveal>
 
       <div className="h-px bg-white/8" />
 

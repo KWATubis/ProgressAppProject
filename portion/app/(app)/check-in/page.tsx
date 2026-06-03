@@ -7,6 +7,8 @@ import { isTaskScheduledOn } from "@/lib/utils/tasks";
 import { DailyCheckInPage } from "@/components/checkin/DailyCheckInPage";
 import { WhyAnchorCallout, type WhyAnchor } from "@/components/checkin/WhyAnchorCallout";
 import { VoiceNoteRecorder } from "@/components/checkin/VoiceNoteRecorder";
+import { PageHeading } from "@/components/layout/PageHeading";
+import { Reveal } from "@/components/motion/Reveal";
 import type { TodayTask } from "@/components/dashboard/TodayTaskList";
 import type { Meal } from "@/components/checkin/DietLogForm";
 import type { MetricValues } from "@/components/checkin/BodyMetricForm";
@@ -93,41 +95,45 @@ export default async function CheckInPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Daily check-in</h1>
-          <p className="text-sm text-muted-foreground">
-            {today.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-          </p>
-        </div>
-        <Link
-          href="/check-in/weekly"
-          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
-            isSunday
-              ? "border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
-              : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-          }`}
-        >
-          {isSunday ? "✦ Weekly reflection" : "Weekly reflection"}
-        </Link>
-      </div>
-      <WhyAnchorCallout anchors={whyAnchors} />
-      <VoiceNoteRecorder dateISO={todayISO} />
-      <DailyCheckInPage
-        dateISO={todayISO}
-        tasks={todayTasks}
-        meals={meals}
-        metric={metric}
-        activityTypes={
-          activityTypes as Array<{
-            id: string;
-            name: string;
-            slug: string;
-            icon: string | null;
-            kind: "STRENGTH" | "CARDIO" | "SPORT";
-          }>
+      <PageHeading
+        title="Daily check-in"
+        description={today.toLocaleDateString(undefined, {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        })}
+        action={
+          <Link
+            href="/check-in/weekly"
+            className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+              isSunday
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-500 hover:bg-amber-500/20"
+                : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+            }`}
+          >
+            {isSunday ? "✦ Weekly reflection" : "Weekly reflection"}
+          </Link>
         }
       />
+      <WhyAnchorCallout anchors={whyAnchors} />
+      <VoiceNoteRecorder dateISO={todayISO} />
+      <Reveal delay={0.08}>
+        <DailyCheckInPage
+          dateISO={todayISO}
+          tasks={todayTasks}
+          meals={meals}
+          metric={metric}
+          activityTypes={
+            activityTypes as Array<{
+              id: string;
+              name: string;
+              slug: string;
+              icon: string | null;
+              kind: "STRENGTH" | "CARDIO" | "SPORT";
+            }>
+          }
+        />
+      </Reveal>
     </div>
   );
 }
