@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight } from "@/lib/utils/dates";
 import { Card, CardContent } from "@/components/ui/card";
+import { Stagger } from "@/components/motion/Stagger";
 
 type ActivitySummary = {
   id: string;
@@ -92,7 +93,7 @@ export default async function MoneyOverviewPage() {
   });
 
   return (
-    <div className="space-y-8">
+    <Stagger className="space-y-8">
       {/* This month income summary */}
       <section>
         <Card className="border-white/10 bg-gradient-to-br from-indigo-500/[0.06] to-transparent shadow-[0_4px_20px_-8px_rgba(0,0,0,0.6)]">
@@ -104,7 +105,7 @@ export default async function MoneyOverviewPage() {
               </span>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="text-3xl font-semibold tabular-nums">
+              <span className="font-display text-4xl tabular-nums">
                 {monthIncome.toLocaleString()} zł
               </span>
               {incomeGoal?.targetValue != null && (
@@ -145,7 +146,7 @@ export default async function MoneyOverviewPage() {
               <Link
                 key={s.id}
                 href={`/money/activity/${s.slug}`}
-                className="group rounded-lg border border-white/10 bg-card p-4 transition-colors hover:bg-accent/20"
+                className="group rounded-lg border border-white/10 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-white/20 hover:bg-accent/20"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
@@ -155,7 +156,7 @@ export default async function MoneyOverviewPage() {
                   <ArrowRight className="h-3.5 w-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </div>
                 <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-semibold tabular-nums">{s.primary}</span>
+                  <span className="font-display text-2xl tabular-nums">{s.primary}</span>
                   <span className="text-xs text-muted-foreground">{s.primaryLabel}</span>
                 </div>
                 {s.secondary && (
@@ -211,6 +212,6 @@ export default async function MoneyOverviewPage() {
           </div>
         )}
       </section>
-    </div>
+    </Stagger>
   );
 }

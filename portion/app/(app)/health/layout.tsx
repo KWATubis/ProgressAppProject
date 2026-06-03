@@ -17,9 +17,14 @@ export default async function HealthLayout({ children }: { children: React.React
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Health</h1>
-        <p className="text-sm text-muted-foreground">Training, nutrition, and body metrics.</p>
-        <HealthSubNav activityTypes={activityTypes as any} />
+        <h1 className="font-display text-3xl uppercase leading-none tracking-wide">Health</h1>
+        <p className="mt-2 text-sm text-muted-foreground">Training, nutrition, and body metrics.</p>
+        <HealthSubNav
+          activityTypes={activityTypes.map((a) => ({
+            ...a,
+            kind: a.kind as "STRENGTH" | "CARDIO" | "SPORT",
+          }))}
+        />
       </div>
       {children}
     </div>

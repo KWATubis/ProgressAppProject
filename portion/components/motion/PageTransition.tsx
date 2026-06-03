@@ -14,12 +14,17 @@ export function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const reduce = useReducedMotion();
 
+  // Key on the top-level segment so sub-tab navigation (e.g. /health → /health/diet)
+  // keeps the section layout mounted — its sub-nav indicator can slide, and only
+  // major section changes cross-fade.
+  const segment = "/" + (pathname.split("/")[1] ?? "");
+
   if (reduce) return <>{children}</>;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
-        key={pathname}
+        key={segment}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}

@@ -19,8 +19,8 @@ export default async function MoneyLayout({ children }: { children: React.ReactN
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Money</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="font-display text-3xl uppercase leading-none tracking-wide">Money</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           Build wealth and future possibilities — income, audience, skills, and the assets that compound into it.
         </p>
         <MoneySubNav activityTypes={activityTypes.map((a) => ({

@@ -13,6 +13,7 @@ import { MUSCLE_GROUPS, type MuscleGroup, type MuscleState } from "@/lib/body/mu
 import { getMuscleStates } from "@/lib/body/muscle-state.server";
 import { StrengthPRs } from "@/components/health/StrengthPRs";
 import { loadStrengthPRs } from "@/lib/strength.server";
+import { Stagger } from "@/components/motion/Stagger";
 
 export default async function HealthOverviewPage() {
   const supabase = await createClient();
@@ -96,7 +97,7 @@ export default async function HealthOverviewPage() {
     | null;
 
   return (
-    <div className="space-y-8">
+    <Stagger className="space-y-8">
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-semibold">Today</h2>
@@ -180,6 +181,6 @@ export default async function HealthOverviewPage() {
           <MacroChart data={macroData} />
         </div>
       </section>
-    </div>
+    </Stagger>
   );
 }
