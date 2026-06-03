@@ -303,7 +303,27 @@
       "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; npx tsc --noEmit; if \\($?\\) { Write-Output \"--- tsc clean; linting body files ---\"; npx eslint components/body/HoloBody.tsx components/body/HolographicMaterial.ts })",
       "Bash(curl.exe -s -o NUL -w \"landing: %{http_code}\\\\n\" http://localhost:3000/)",
       "Bash(curl.exe -s -o NUL -w \"dashboard: %{http_code}\\\\n\" http://localhost:3000/dashboard)",
-      "Bash(curl.exe -s -o NUL -w '%{http_code}' http://localhost:3000/__TRACKED_VAR__)"
+      "Bash(curl.exe -s -o NUL -w '%{http_code}' http://localhost:3000/__TRACKED_VAR__)",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; node \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\\\\scripts\\\\list-auth-users.mjs\")",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; node \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\\\\scripts\\\\delete-test-users.mjs\")",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; npx tsc --noEmit -p tsconfig.json 2>&1 | Select-Object -First 40)",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; Write-Output \"=== vercel CLI ===\"; try { vercel --version } catch { Write-Output \"NOT INSTALLED\" }; Write-Output \"=== whoami ===\"; try { vercel whoami } catch { Write-Output \"NOT LOGGED IN\" })",
+      "PowerShell(vercel whoami *)",
+      "PowerShell(vercel link *)",
+      "PowerShell(vercel env *)",
+      "PowerShell(vercel *)",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; try { $r = Invoke-WebRequest -Uri \"https://portion-green.vercel.app\" -Method Head -TimeoutSec 30; Write-Output \\(\"HTTP \" + $r.StatusCode\\) } catch { Write-Output \\(\"ERR: \" + $_.Exception.Message\\) })",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; curl.exe -s -o NUL -w \"%{http_code}\" https://portion-green.vercel.app; Write-Output \"\")",
+      "PowerShell(curl.exe -sk -o NUL -w \"%{http_code}\" https://portion-green.vercel.app; Write-Output \"\")",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; node \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\\\\scripts\\\\verify-redirect.mjs\")",
+      "PowerShell(vercel git *)",
+      "Bash(powershell.exe *)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\"; $raw = Get-Content .vercel\\\\prod3.env -Raw; $marker='NEXT_PUBLIC_SUPABASE_ANON_KEY'; $idx=$raw.IndexOf\\($marker\\); $slice = $raw.Substring\\($idx, [Math]::Min\\(90,$raw.Length-$idx\\)\\); Write-Output \"RAW SLICE:\"; Write-Output $slice; Write-Output \"---\"; Write-Output \\(\"char codes: \" + \\(\\($slice[0..45] | ForEach-Object { [int][char]$_ }\\) -join ','\\)\\))",
+      "PowerShell($body = curl.exe -sk \"https://portion-green.vercel.app/auth/login\"; if \\($body -match \"ByteString|Cannot convert argument\"\\) { Write-Output \"STILL BROKEN: found ByteString error in page\" } elseif \\($body -match \"Sign in to your account\"\\) { Write-Output \"LOGIN PAGE OK: renders cleanly, no header error\" } else { Write-Output \"UNEXPECTED: neither marker found\"; Write-Output \\($body.Substring\\(0,[Math]::Min\\(400,$body.Length\\)\\)\\) })",
+      "Read(//c/Users/jkond/**)",
+      "Read(//c/Users/jkond/AppData/Roaming/**)",
+      "Read(//c/Users/jkond/AppData/Local/com.vercel.cli/**)",
+      "PowerShell($env:NODE_TLS_REJECT_UNAUTHORIZED=\"0\"; node \"C:\\\\Users\\\\jkond\\\\Desktop\\\\ProgressAppProject\\\\portion\\\\scripts\\\\set-vercel-env.mjs\")"
     ]
   }
 }
