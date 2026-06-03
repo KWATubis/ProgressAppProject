@@ -9,6 +9,8 @@ import { QuickStats } from "@/components/dashboard/QuickStats";
 import { CompoundingWeekCard } from "@/components/dashboard/CompoundingWeekCard";
 import { ShareProgressButton } from "@/components/dashboard/ShareProgressButton";
 import { StreakRecoveryBanner } from "@/components/dashboard/StreakRecoveryBanner";
+import { Reveal } from "@/components/motion/Reveal";
+import { Stagger } from "@/components/motion/Stagger";
 import { withDerivedCurrent } from "@/lib/goalMetrics.server";
 import { computeWeeklySummary } from "@/lib/dashboard/weekly-summary";
 import { detectBrokenStreaks } from "@/lib/tasks/streaks";
@@ -106,12 +108,12 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <Reveal className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-serif text-3xl italic leading-tight tracking-tight">
             {greetingName ? `Good to see you, ${greetingName}.` : "Dashboard"}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             {today.toLocaleDateString(undefined, {
               weekday: "long",
               month: "long",
@@ -120,69 +122,70 @@ export default async function DashboardPage() {
           </p>
         </div>
         <ShareProgressButton />
-      </div>
+      </Reveal>
 
       <StreakRecoveryBanner streaks={brokenStreaks} />
 
-      <CompoundingWeekCard summary={weeklySummary} />
+      <Stagger className="space-y-6">
+        <CompoundingWeekCard summary={weeklySummary} />
 
-      {lastReflection && (
-        <div className="rounded-xl border border-border bg-card/50 p-5 space-y-3">
-          <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Last week</p>
-          {lastReflection.wins && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">🏆 Wins</p>
-              <p className="text-sm whitespace-pre-wrap">{lastReflection.wins}</p>
-            </div>
-          )}
-          {lastReflection.priority && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">🎯 This week&apos;s #1</p>
-              <p className="text-sm font-medium">{lastReflection.priority}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      <QuickStats
-        stats={[
-          {
-            icon: "weight",
-            label: "Weight",
-            value: latestWeight?.weightKg ? `${latestWeight.weightKg} kg` : "—",
-            sub: weightGoal?.targetValue ? `Target ${weightGoal.targetValue} kg` : undefined,
-          },
-          {
-            icon: "kcal",
-            label: "Today",
-            value: kcalToday ? `${kcalToday} kcal` : "—",
-            sub: proteinToday ? `${Math.round(proteinToday)} g protein` : "No meals logged",
-          },
-          {
-            icon: "followers",
-            label: "TikTok",
-            value: latestSocial?.followerCount?.toLocaleString() ?? "—",
-            sub: tiktokGoal?.targetValue
-              ? `Target ${tiktokGoal.targetValue.toLocaleString()}`
-              : undefined,
-          },
-        ]}
-      />
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <DashboardPillarCard pillar="HEALTH" {...health} />
-        <DashboardPillarCard pillar="MONEY" {...money} />
-      </div>
-
-      <section className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">Today</h2>
-          <div className="text-xs text-muted-foreground">
-            {todayItems.filter((t) => t.status === "COMPLETE").length}/{todayItems.length} complete
+        {lastReflection && (
+          <div className="rounded-xl border border-border bg-card/50 p-5 space-y-3">
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Last week</p>
+            {lastReflection.wins && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">🏆 Wins</p>
+                <p className="text-sm whitespace-pre-wrap">{lastReflection.wins}</p>
+              </div>
+            )}
+            {lastReflection.priority && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">🎯 This week&apos;s #1</p>
+                <p className="text-sm font-medium">{lastReflection.priority}</p>
+              </div>
+            )}
           </div>
+        )}
+
+        <QuickStats
+          stats={[
+            {
+              icon: "weight",
+              label: "Weight",
+              value: latestWeight?.weightKg != null ? Number(latestWeight.weightKg) : null,
+              unit: "kg",
+              decimals: 1,
+              sub: weightGoal?.targetValue ? `Target ${weightGoal.targetValue} kg` : undefined,
+            },
+            {
+              icon: "kcal",
+              label: "Today",
+              value: kcalToday || null,
+              unit: "kcal",
+              sub: proteinToday ? `${Math.round(proteinToday)} g protein` : "No meals logged",
+            },
+            {
+              icon: "followers",
+              label: "TikTok",
+              value: latestSocial?.followerCount ?? null,
+              thousands: true,
+              sub: tiktokGoal?.targetValue
+                ? `Target ${tiktokGoal.targetValue.toLocaleString()}`
+                : undefined,
+            },
+          ]}
+        />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <DashboardPillarCard pillar="HEALTH" {...health} />
+          <DashboardPillarCard pillar="MONEY" {...money} />
         </div>
-        <TodayTaskList initial={todayItems} dateISO={todayISO} />
-      </section>
+
+        <section className="space-y-2">
+          <h2 className="font-display text-xl uppercase tracking-wide">Today</h2>
+          <TodayTaskList initial={todayItems} dateISO={todayISO} />
+        </section>
+      </Stagger>
     </div>
   );
 }

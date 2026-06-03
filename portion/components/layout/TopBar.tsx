@@ -14,7 +14,7 @@ export function TopBar({ email, name }: TopBarProps) {
     <header className="flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-sm sm:px-6">
       <div className="flex items-center gap-2 md:hidden">
         <MobileNav />
-        <span className="text-sm font-semibold text-foreground">Portion</span>
+        <span className="font-display text-base uppercase tracking-wide text-foreground">Portion</span>
       </div>
       <div className="ml-auto flex items-center gap-3">
         {displayName && (
@@ -22,7 +22,7 @@ export function TopBar({ email, name }: TopBarProps) {
         )}
         <Link
           href="/settings"
-          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground hover:rotate-45"
           aria-label="Settings"
         >
           <Settings className="h-4 w-4" />

@@ -8,18 +8,18 @@ export function AmbientBackground() {
       {/* Base — deep near-black with subtle vertical fade */}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,#050505_0%,#0a0a0a_50%,#070707_100%)]" />
 
-      {/* Large warm glow top-left */}
+      {/* Large warm glow top-left — slowly drifts */}
       <div
-        className="absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full opacity-60 blur-3xl"
+        className="amb-glow-a absolute -left-40 -top-40 h-[600px] w-[600px] rounded-full opacity-60 blur-3xl"
         style={{
           background:
             "radial-gradient(circle, rgba(80,60,40,0.18) 0%, rgba(40,30,20,0.08) 40%, transparent 70%)",
         }}
       />
 
-      {/* Cool glow bottom-right */}
+      {/* Cool glow bottom-right — slowly drifts */}
       <div
-        className="absolute -bottom-40 -right-40 h-[700px] w-[700px] rounded-full opacity-50 blur-3xl"
+        className="amb-glow-b absolute -bottom-40 -right-40 h-[700px] w-[700px] rounded-full opacity-50 blur-3xl"
         style={{
           background:
             "radial-gradient(circle, rgba(40,50,80,0.18) 0%, rgba(20,25,40,0.08) 40%, transparent 70%)",
@@ -56,6 +56,15 @@ export function AmbientBackground() {
 
       {/* Top fade for the topbar area */}
       <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/40 to-transparent" />
+
+      {/* Film grain — ties the app to the landing's cinematic texture */}
+      <div
+        className="absolute inset-0 opacity-[0.04] mix-blend-overlay"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+        }}
+      />
     </div>
   );
 }

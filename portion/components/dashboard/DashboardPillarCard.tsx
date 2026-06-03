@@ -2,8 +2,10 @@
 
 import { useSyncExternalStore } from "react";
 import { Dumbbell, TrendingUp } from "lucide-react";
+import { motion } from "framer-motion";
 import { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CountUp } from "@/components/motion/CountUp";
 
 const subscribe = () => () => {};
 function useHasMounted(): boolean {
@@ -76,7 +78,12 @@ export function DashboardPillarCard({ pillar, goals, totalTasks, completedTasks 
   const mounted = useHasMounted();
 
   return (
-    <Card className="relative overflow-hidden border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.01] to-transparent shadow-[0_8px_30px_-12px_rgba(0,0,0,0.6)]">
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ type: "spring", stiffness: 400, damping: 26 }}
+      className="h-full"
+    >
+    <Card className="relative h-full overflow-hidden border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.01] to-transparent shadow-[0_8px_30px_-12px_rgba(0,0,0,0.6)] transition-colors hover:border-white/20">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="flex items-center gap-2 text-base font-semibold">
           <Icon className="h-4 w-4 text-muted-foreground" />
@@ -109,10 +116,10 @@ export function DashboardPillarCard({ pillar, goals, totalTasks, completedTasks 
             )}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center leading-none">
               <span
-                className="text-xl font-semibold tabular-nums"
+                className="font-display text-2xl tabular-nums"
                 style={{ color: ringColor }}
               >
-                {avgPct}%
+                <CountUp value={avgPct} />%
               </span>
               <span className="mt-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
                 goal
@@ -165,6 +172,7 @@ export function DashboardPillarCard({ pillar, goals, totalTasks, completedTasks 
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   );
 }
 

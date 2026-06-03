@@ -7,9 +7,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-anton), var(--font-geist), sans-serif;
+  --font-display: var(--font-anton), var(--font-geist), sans-serif;
+  --font-serif: var(--font-instrument), ui-serif, Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -123,8 +125,57 @@
   }
   body {
     @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
   }
   html {
     @apply font-sans;
+  }
+  /* Display headings render in Anton — tighten the tracking it ships with. */
+  .font-display,
+  .font-heading {
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: oklch(1 0 0 / 0.16);
+  }
+}
+
+/* ── Ambient background drift — slow, GPU-cheap, motion-safe ── */
+@keyframes amb-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  33% {
+    transform: translate3d(70px, 40px, 0);
+  }
+  66% {
+    transform: translate3d(-40px, 24px, 0);
+  }
+}
+@keyframes amb-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  33% {
+    transform: translate3d(-60px, -34px, 0);
+  }
+  66% {
+    transform: translate3d(44px, -22px, 0);
+  }
+}
+.amb-glow-a {
+  animation: amb-drift-a 26s ease-in-out infinite;
+  will-change: transform;
+}
+.amb-glow-b {
+  animation: amb-drift-b 34s ease-in-out infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .amb-glow-a,
+  .amb-glow-b {
+    animation: none;
   }
 }

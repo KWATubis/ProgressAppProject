@@ -1,8 +1,10 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
+import { motion } from "framer-motion";
 import { RadialBar, RadialBarChart, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { Card, CardContent } from "@/components/ui/card";
+import { CountUp } from "@/components/motion/CountUp";
 import type { WeeklySummary } from "@/lib/dashboard/weekly-summary";
 
 const subscribe = () => () => {};
@@ -32,7 +34,8 @@ export function CompoundingWeekCard({ summary }: { summary: WeeklySummary }) {
   const ringColor = progressColor(scorePct);
 
   return (
-    <Card className="relative overflow-hidden border-white/10 bg-gradient-to-br from-white/[0.05] via-white/[0.015] to-transparent shadow-[0_8px_30px_-12px_rgba(0,0,0,0.7)]">
+    <motion.div whileHover={{ y: -3 }} transition={{ type: "spring", stiffness: 400, damping: 26 }}>
+    <Card className="relative overflow-hidden border-white/10 bg-gradient-to-br from-white/[0.05] via-white/[0.015] to-transparent shadow-[0_8px_30px_-12px_rgba(0,0,0,0.7)] transition-colors hover:border-white/20">
       <CardContent className="flex flex-col gap-5 py-5 sm:flex-row sm:items-center">
         <div className="flex items-center gap-4 sm:w-64 sm:shrink-0">
           <div className="relative h-24 w-24 shrink-0">
@@ -51,8 +54,14 @@ export function CompoundingWeekCard({ summary }: { summary: WeeklySummary }) {
               </ResponsiveContainer>
             )}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center leading-none">
-              <span className="text-xl font-semibold tabular-nums" style={{ color: ringColor }}>
-                {judged > 0 ? `${good}/${judged}` : "—"}
+              <span className="font-display text-2xl tabular-nums" style={{ color: ringColor }}>
+                {judged > 0 ? (
+                  <>
+                    <CountUp value={good} />/{judged}
+                  </>
+                ) : (
+                  "—"
+                )}
               </span>
               <span className="mt-0.5 text-[9px] uppercase tracking-wider text-muted-foreground">fronts</span>
             </div>
@@ -76,5 +85,6 @@ export function CompoundingWeekCard({ summary }: { summary: WeeklySummary }) {
         </div>
       </CardContent>
     </Card>
+    </motion.div>
   );
 }

@@ -1,12 +1,19 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Anton, Instrument_Serif, Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+// Brand type system — shared with the landing page so the whole product speaks
+// one voice. Anton = display, Instrument Serif = editorial accent, Geist = body.
+const anton = Anton({ weight: "400", subsets: ["latin"], variable: "--font-anton" });
+const instrument = Instrument_Serif({
+  weight: "400",
+  style: ["normal", "italic"],
   subsets: ["latin"],
+  variable: "--font-instrument",
 });
+const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
 
 export const metadata: Metadata = {
   title: "Portion — Health + Money",
@@ -20,7 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} dark h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${anton.variable} ${instrument.variable} ${geist.variable} ${geistMono.variable} dark h-full antialiased`}
+    >
       <body className="min-h-full bg-background font-sans text-foreground">
         {children}
         <Toaster richColors position="top-right" theme="dark" />
