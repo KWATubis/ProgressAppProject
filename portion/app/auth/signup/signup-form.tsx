@@ -10,6 +10,7 @@ import { signup } from "../actions";
 export function SignupForm() {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   function onSubmit(formData: FormData) {
     setError(null);
@@ -18,8 +19,25 @@ export function SignupForm() {
       if (result && "error" in result) {
         setError(result.error);
         toast.error(result.error);
+      } else if (result && "needsConfirmation" in result && result.needsConfirmation) {
+        setSentTo(String(formData.get("email") ?? ""));
       }
     });
+  }
+
+  if (sentTo) {
+    return (
+      <div className="space-y-3 text-center">
+        <p className="text-lg font-medium">Check your email</p>
+        <p className="text-sm text-muted-foreground">
+          We sent a confirmation link to <span className="font-medium">{sentTo}</span>.
+          Click it to verify your account and finish setting up.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Didn&apos;t get it? Check spam, or wait a minute and try again.
+        </p>
+      </div>
+    );
   }
 
   return (
