@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { formatISODate } from "@/lib/utils/dates";
 import { WeightProgressChart, type WeightDataPoint } from "@/components/charts/WeightProgressChart";
+import { Stagger } from "@/components/motion/Stagger";
 
 export default async function HealthMetricsPage() {
   const supabase = await createClient();
@@ -32,7 +33,7 @@ export default async function HealthMetricsPage() {
   ];
 
   return (
-    <div className="space-y-8">
+    <Stagger className="space-y-8">
       <section className="space-y-3">
         <h2 className="text-base font-semibold">Weight Chart</h2>
         <div className="rounded-lg border border-white/10 bg-card p-4">
@@ -99,6 +100,6 @@ export default async function HealthMetricsPage() {
           </div>
         )}
       </section>
-    </div>
+    </Stagger>
   );
 }

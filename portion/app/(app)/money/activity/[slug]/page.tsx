@@ -85,7 +85,7 @@ export default async function MoneyActivityPage({
 
   const header = (
     <div className="flex items-start justify-between gap-2">
-      <h2 className="flex items-center gap-2.5 text-xl font-semibold">
+      <h2 className="flex items-center gap-2.5 font-display text-2xl">
         {activity.color && (
           <span
             className="inline-block h-3 w-3 rounded-full"
@@ -142,12 +142,12 @@ export default async function MoneyActivityPage({
         {latest != null && (
           <div className="flex gap-6 text-sm">
             <div>
-              <p className="text-2xl font-semibold tabular-nums">{latest.toLocaleString()}</p>
+              <p className="font-display text-2xl tabular-nums">{latest.toLocaleString()}</p>
               <p className="text-muted-foreground">followers</p>
             </div>
             {history.length > 1 && (
               <div>
-                <p className="text-2xl font-semibold tabular-nums">
+                <p className="font-display text-2xl tabular-nums">
                   {(history[0].followerCount - history[history.length - 1].followerCount).toLocaleString()}
                 </p>
                 <p className="text-muted-foreground">gained all-time</p>
@@ -282,15 +282,15 @@ export default async function MoneyActivityPage({
       {entries.length > 0 && (
         <div className="flex gap-6 text-sm">
           <div>
-            <p className="text-2xl font-semibold tabular-nums">{total.toLocaleString()} zł</p>
+            <p className="font-display text-2xl tabular-nums">{total.toLocaleString()} zł</p>
             <p className="text-muted-foreground">total all-time</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold tabular-nums">{thisMonthTotal.toLocaleString()} zł</p>
+            <p className="font-display text-2xl tabular-nums">{thisMonthTotal.toLocaleString()} zł</p>
             <p className="text-muted-foreground">this month</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold tabular-nums">{entries.length}</p>
+            <p className="font-display text-2xl tabular-nums">{entries.length}</p>
             <p className="text-muted-foreground">{cfg.entryWord}s logged</p>
           </div>
         </div>
@@ -300,19 +300,19 @@ export default async function MoneyActivityPage({
         <div className="flex flex-wrap gap-6 text-sm">
           {latestBusiness.clients != null && (
             <div>
-              <p className="text-2xl font-semibold tabular-nums">{latestBusiness.clients}</p>
+              <p className="font-display text-2xl tabular-nums">{latestBusiness.clients}</p>
               <p className="text-muted-foreground">clients</p>
             </div>
           )}
           {latestBusiness.leads != null && (
             <div>
-              <p className="text-2xl font-semibold tabular-nums">{latestBusiness.leads}</p>
+              <p className="font-display text-2xl tabular-nums">{latestBusiness.leads}</p>
               <p className="text-muted-foreground">leads (latest)</p>
             </div>
           )}
           {latestBusiness.deals != null && (
             <div>
-              <p className="text-2xl font-semibold tabular-nums">{latestBusiness.deals}</p>
+              <p className="font-display text-2xl tabular-nums">{latestBusiness.deals}</p>
               <p className="text-muted-foreground">deals (latest)</p>
             </div>
           )}

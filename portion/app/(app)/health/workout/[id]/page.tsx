@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { ExerciseSetRow, type ExerciseWithSets } from "@/components/health/ExerciseSetRow";
 import { DeleteSessionButton } from "@/components/health/DeleteSessionButton";
 import { detectSessionPRs } from "@/lib/strength.server";
+import { Reveal } from "@/components/motion/Reveal";
 
 export default async function WorkoutDetailPage({
   params,
@@ -76,7 +77,7 @@ export default async function WorkoutDetailPage({
   }
 
   return (
-    <div className="space-y-5">
+    <Reveal className="space-y-5">
       <div>
         <Link
           href="/health/workout"
@@ -85,7 +86,7 @@ export default async function WorkoutDetailPage({
           <ChevronLeft className="h-3.5 w-3.5" /> All workouts
         </Link>
         <div className="flex items-start justify-between gap-2">
-          <h2 className="text-xl font-semibold">{session.type}</h2>
+          <h2 className="font-display text-2xl">{session.type}</h2>
           <DeleteSessionButton sessionId={session.id} redirectTo="/health/workout" />
         </div>
         <p className="text-sm text-muted-foreground">{dateStr}</p>
@@ -125,6 +126,6 @@ export default async function WorkoutDetailPage({
           </div>
         </section>
       )}
-    </div>
+    </Reveal>
   );
 }

@@ -107,7 +107,7 @@ export default async function ActivityPage({
 
   const header = (
     <div className="flex items-start justify-between gap-2">
-      <h2 className="flex items-center gap-2.5 text-xl font-semibold">
+      <h2 className="flex items-center gap-2.5 font-display text-2xl">
         {activity.color && (
           <span
             className="inline-block h-3 w-3 rounded-full"
@@ -266,18 +266,18 @@ export default async function ActivityPage({
         {sessions.length > 0 && (
           <div className="flex gap-6 text-sm">
             <div>
-              <p className="text-2xl font-semibold tabular-nums">{totalKm.toFixed(1)}</p>
+              <p className="font-display text-2xl tabular-nums">{totalKm.toFixed(1)}</p>
               <p className="text-muted-foreground">km total</p>
             </div>
             {avgPace != null && (
               <div>
-                <p className="text-2xl font-semibold tabular-nums">{paceStr(avgPace)}</p>
+                <p className="font-display text-2xl tabular-nums">{paceStr(avgPace)}</p>
                 <p className="text-muted-foreground">avg pace /km</p>
               </div>
             )}
             {longestRun > 0 && (
               <div>
-                <p className="text-2xl font-semibold tabular-nums">{longestRun.toFixed(1)}</p>
+                <p className="font-display text-2xl tabular-nums">{longestRun.toFixed(1)}</p>
                 <p className="text-muted-foreground">longest run (km)</p>
               </div>
             )}
@@ -350,11 +350,11 @@ export default async function ActivityPage({
       {totalSessions > 0 && (
         <div className="flex gap-6 text-sm">
           <div>
-            <p className="text-2xl font-semibold tabular-nums">{totalSessions}</p>
+            <p className="font-display text-2xl tabular-nums">{totalSessions}</p>
             <p className="text-muted-foreground">total sessions</p>
           </div>
           <div>
-            <p className="text-2xl font-semibold tabular-nums">{thisWeekCount}</p>
+            <p className="font-display text-2xl tabular-nums">{thisWeekCount}</p>
             <p className="text-muted-foreground">this week</p>
           </div>
         </div>

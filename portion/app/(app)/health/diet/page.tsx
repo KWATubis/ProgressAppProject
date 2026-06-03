@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate, addDays, parseISODate } from "@/lib/utils/dates";
 import { MacroSummaryBar } from "@/components/health/MacroSummaryBar";
 import { MealCard, type MealItem } from "@/components/health/MealCard";
+import { Reveal } from "@/components/motion/Reveal";
 
 const SLOT_ORDER = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"];
 
@@ -64,7 +65,7 @@ export default async function HealthDietPage({
   };
 
   return (
-    <div className="space-y-5">
+    <Reveal className="space-y-5">
       <div className="flex items-center gap-3">
         <Link
           href={`/health/diet?date=${prevDate}`}
@@ -119,6 +120,6 @@ export default async function HealthDietPage({
           ))}
         </div>
       )}
-    </div>
+    </Reveal>
   );
 }
