@@ -9,6 +9,7 @@ import { QuickStats } from "@/components/dashboard/QuickStats";
 import { CompoundingWeekCard } from "@/components/dashboard/CompoundingWeekCard";
 import { ShareProgressButton } from "@/components/dashboard/ShareProgressButton";
 import { StreakRecoveryBanner } from "@/components/dashboard/StreakRecoveryBanner";
+import { GarminSyncedChip } from "@/components/health/GarminSyncedChip";
 import { Reveal } from "@/components/motion/Reveal";
 import { Stagger } from "@/components/motion/Stagger";
 import { withDerivedCurrent } from "@/lib/goalMetrics.server";
@@ -30,7 +31,7 @@ export default async function DashboardPage() {
   // and on Monday that Sunday is yesterday — exactly when the user would have filled it in).
   const reflectionWeekStart = isMonday ? getWeekDates(today)[0] : null;
 
-  const [profile, rawGoals, tasks, logsToday, latestWeight, dietToday, latestSocial, weeklySummary, brokenStreaks, lastReflection] = await Promise.all([
+  const [profile, rawGoals, tasks, logsToday, latestWeight, dietToday, latestSocial, weeklySummary, brokenStreaks, lastReflection, lastGarminSync] = await Promise.all([
     prisma.profile.findUnique({ where: { id: user.id }, select: { name: true, email: true } }),
     prisma.goal.findMany({
       where: { profileId: user.id, isActive: true, activityTypeId: null },
@@ -59,6 +60,11 @@ export default async function DashboardPage() {
           select: { wins: true, learning: true, priority: true },
         })
       : Promise.resolve(null),
+    prisma.wellnessDay.findFirst({
+      where: { profileId: user.id },
+      orderBy: { syncedAt: "desc" },
+      select: { syncedAt: true },
+    }),
   ]);
 
   const goals = await withDerivedCurrent(rawGoals);
@@ -120,6 +126,11 @@ export default async function DashboardPage() {
               day: "numeric",
             })}
           </p>
+          {lastGarminSync?.syncedAt && (
+            <div className="mt-2">
+              <GarminSyncedChip syncedAt={lastGarminSync.syncedAt} />
+            </div>
+          )}
         </div>
         <ShareProgressButton />
       </Reveal>
