@@ -165,7 +165,7 @@ export default function LandingPage() {
             transition={{ duration: 0.6, ease: EASE, delay: 0.5 }}
             className="max-w-md text-[15px] leading-relaxed text-white/55"
           >
-            Body. Bag. Brain. One screen. No more six notes apps, three trackers
+            Body. Bag. One screen. No more six notes apps, three trackers
             and a vibe. Log it, see it, move.
           </motion.p>
 
@@ -288,7 +288,7 @@ export default function LandingPage() {
             items={[
               "Started Tuesday. Hasn't stopped.",
               "Hits 180g protein. Every day.",
-              "One screen. Body, money, brain.",
+              "One screen. Body and money.",
               "47-day streak. Knows it cold.",
               "Sees the gap shrink in real numbers.",
             ]}
