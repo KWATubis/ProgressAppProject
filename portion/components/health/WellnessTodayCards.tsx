@@ -196,7 +196,7 @@ export function WellnessTodayCards({
         <div className="mt-1 text-[11px] text-muted-foreground">
           {calories.active != null && calories.resting != null
             ? `Active ${fmtInt(calories.active)} · BMR ${fmtInt(calories.resting)}`
-            : "Sync Garmin to see breakdown"}
+            : "Run a Garmin sync to see breakdown"}
         </div>
       </Card>
 
@@ -244,7 +244,7 @@ export function WellnessTodayCards({
       </Card>
       {noData ? (
         <div className="col-span-full text-center text-xs text-muted-foreground">
-          No wellness data yet — hit <strong>Sync Garmin</strong> above.
+          No wellness data yet — run the <strong>Sync Garmin</strong> shortcut on your desktop.
         </div>
       ) : null}
     </div>
