@@ -7,7 +7,6 @@ import { toUtcMidnight, formatISODate, addDays } from "@/lib/utils/dates";
 import { WeightProgressChart, type WeightDataPoint } from "@/components/charts/WeightProgressChart";
 import { MacroChart, type MacroDay } from "@/components/charts/MacroChart";
 import { WellnessTodayCards } from "@/components/health/WellnessTodayCards";
-import { GarminSyncButton } from "@/components/health/GarminSyncButton";
 import { BodyExplorer } from "@/components/body/BodyExplorer";
 import { MUSCLE_GROUPS, type MuscleGroup, type MuscleState } from "@/lib/body/muscle-state";
 import { getMuscleStates } from "@/lib/body/muscle-state.server";
@@ -101,10 +100,17 @@ export default async function HealthOverviewPage() {
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <h2 className="text-base font-semibold">Today</h2>
-          <GarminSyncButton
-            days={7}
-            lastSyncedAt={wellnessToday?.syncedAt?.toISOString() ?? null}
-          />
+          {wellnessToday?.syncedAt && (
+            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              Garmin synced{" "}
+              {wellnessToday.syncedAt.toLocaleString(undefined, {
+                hour: "numeric",
+                minute: "2-digit",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          )}
         </div>
         <WellnessTodayCards
           hr={{

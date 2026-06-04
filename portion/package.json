@@ -7,6 +7,7 @@
     "predev": "prisma generate",
     "build": "prisma generate && next build",
     "start": "next start",
+    "garmin": "set NODE_TLS_REJECT_UNAUTHORIZED=0&& tsx scripts/garmin-sync.ts",
     "lint": "eslint",
     "postinstall": "prisma generate"
   },
@@ -27,6 +28,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.2.1",
+    "fflate": "^0.8.3",
     "framer-motion": "^12.39.0",
     "garmin-connect": "^1.6.2",
     "lucide-react": "^1.16.0",

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { Dumbbell } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
@@ -120,6 +121,13 @@ export default async function ActivityPage({
       </h2>
       <div className="flex items-center gap-2">
         {activity.kind === "CARDIO" && <GarminUploadButton />}
+        {activity.kind === "STRENGTH" && activity.workoutPlan && (
+          <Link href={`/health/activity/${activity.slug}/live`}>
+            <Button size="sm" variant="outline">
+              <Dumbbell className="mr-1 h-3.5 w-3.5" /> Live
+            </Button>
+          </Link>
+        )}
         <Link href="/check-in">
           <Button size="sm">Log session</Button>
         </Link>
