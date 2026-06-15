@@ -1,8 +1,16 @@
 import { cn } from "@/lib/utils";
 
-const TARGETS = { kcal: 2400, proteinG: 180, fatG: 65, carbsG: 301 };
+export const DEFAULT_MACRO_TARGETS = { kcal: 2400, proteinG: 180, fatG: 65, carbsG: 301 };
 
-type Props = { kcal: number; proteinG: number; fatG: number; carbsG: number };
+export type MacroTargets = typeof DEFAULT_MACRO_TARGETS;
+
+type Props = {
+  kcal: number;
+  proteinG: number;
+  fatG: number;
+  carbsG: number;
+  targets?: MacroTargets;
+};
 
 function Bar({
   label,
@@ -43,13 +51,14 @@ function Bar({
   );
 }
 
-export function MacroSummaryBar({ kcal, proteinG, fatG, carbsG }: Props) {
+export function MacroSummaryBar({ kcal, proteinG, fatG, carbsG, targets }: Props) {
+  const t = targets ?? DEFAULT_MACRO_TARGETS;
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <Bar label="Calories" value={kcal} target={TARGETS.kcal} unit="" />
-      <Bar label="Protein" value={proteinG} target={TARGETS.proteinG} unit="g" />
-      <Bar label="Fat" value={fatG} target={TARGETS.fatG} unit="g" />
-      <Bar label="Carbs" value={carbsG} target={TARGETS.carbsG} unit="g" />
+      <Bar label="Calories" value={kcal} target={t.kcal} unit="" />
+      <Bar label="Protein" value={proteinG} target={t.proteinG} unit="g" />
+      <Bar label="Fat" value={fatG} target={t.fatG} unit="g" />
+      <Bar label="Carbs" value={carbsG} target={t.carbsG} unit="g" />
     </div>
   );
 }

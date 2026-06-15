@@ -4,9 +4,10 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate, addDays, parseISODate } from "@/lib/utils/dates";
-import { MacroSummaryBar } from "@/components/health/MacroSummaryBar";
+import { MacroSummaryBar, DEFAULT_MACRO_TARGETS } from "@/components/health/MacroSummaryBar";
 import { MealCard, type MealItem } from "@/components/health/MealCard";
 import { Reveal } from "@/components/motion/Reveal";
+import { DietTargetsDialog } from "./DietTargetsDialog";
 
 const SLOT_ORDER = ["BREAKFAST", "LUNCH", "DINNER", "SNACK"];
 
@@ -26,10 +27,28 @@ export default async function HealthDietPage({
   const date = params.date ? parseISODate(params.date) : today;
   const dateISO = formatISODate(date);
 
-  const meals = await prisma.dietLog.findMany({
-    where: { profileId: user.id, date },
-    orderBy: { createdAt: "asc" },
-  });
+  const [meals, profile] = await Promise.all([
+    prisma.dietLog.findMany({
+      where: { profileId: user.id, date },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.profile.findUnique({
+      where: { id: user.id },
+      select: {
+        dietKcalTarget: true,
+        dietProteinGTarget: true,
+        dietFatGTarget: true,
+        dietCarbsGTarget: true,
+      },
+    }),
+  ]);
+
+  const targets = {
+    kcal: profile?.dietKcalTarget ?? DEFAULT_MACRO_TARGETS.kcal,
+    proteinG: profile?.dietProteinGTarget ?? DEFAULT_MACRO_TARGETS.proteinG,
+    fatG: profile?.dietFatGTarget ?? DEFAULT_MACRO_TARGETS.fatG,
+    carbsG: profile?.dietCarbsGTarget ?? DEFAULT_MACRO_TARGETS.carbsG,
+  };
 
   const totals = meals.reduce(
     (acc, m) => ({
@@ -93,10 +112,13 @@ export default async function HealthDietPage({
             Today
           </Link>
         )}
+        <div className={isToday ? "ml-auto" : ""}>
+          <DietTargetsDialog current={targets} />
+        </div>
       </div>
 
       <div className="rounded-lg border border-white/10 bg-card p-4">
-        <MacroSummaryBar {...totals} />
+        <MacroSummaryBar {...totals} targets={targets} />
       </div>
 
       {meals.length === 0 ? (

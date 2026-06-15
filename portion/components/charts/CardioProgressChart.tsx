@@ -12,6 +12,10 @@ import { ChartFrame } from "./ChartFrame";
 
 export type CardioDataPoint = { date: string; distanceKm: number };
 
+function fmtDate(ts: number) {
+  return new Date(ts).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+}
+
 export function CardioProgressChart({ data }: { data: CardioDataPoint[] }) {
   if (data.length === 0) {
     return (
@@ -23,11 +27,7 @@ export function CardioProgressChart({ data }: { data: CardioDataPoint[] }) {
 
   const formatted = data.map((d) => {
     const [y, m, day] = d.date.split("-").map(Number);
-    const label = new Date(y, m - 1, day).toLocaleDateString("en-GB", {
-      month: "short",
-      day: "numeric",
-    });
-    return { distanceKm: d.distanceKm, label };
+    return { distanceKm: d.distanceKm, ts: Date.UTC(y, m - 1, day) };
   });
 
   return (
@@ -35,7 +35,11 @@ export function CardioProgressChart({ data }: { data: CardioDataPoint[] }) {
       <LineChart data={formatted} margin={{ top: 10, right: 12, left: -24, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
         <XAxis
-          dataKey="label"
+          dataKey="ts"
+          type="number"
+          scale="time"
+          domain={["dataMin", "dataMax"]}
+          tickFormatter={fmtDate}
           tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }}
           tickLine={false}
           axisLine={false}
@@ -56,6 +60,7 @@ export function CardioProgressChart({ data }: { data: CardioDataPoint[] }) {
           }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(v: any) => [`${Number(v).toFixed(2)} km`, "Distance"]}
+          labelFormatter={(ts) => fmtDate(Number(ts))}
           labelStyle={{ color: "rgba(255,255,255,0.45)", marginBottom: 2 }}
           cursor={{ stroke: "rgba(255,255,255,0.1)" }}
         />

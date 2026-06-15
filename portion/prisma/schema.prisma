@@ -73,6 +73,10 @@ model Profile {
   id                String             @id
   email             String             @unique
   name              String?
+  dietKcalTarget    Int?
+  dietProteinGTarget Int?
+  dietFatGTarget    Int?
+  dietCarbsGTarget  Int?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   goals             Goal[]
@@ -91,6 +95,21 @@ model Profile {
   voiceNotes          DailyVoiceNote[]
   weeklyReflections   WeeklyReflection[]
   onboardingSession   OnboardingSession?
+  stravaAccount       StravaAccount?
+}
+
+model StravaAccount {
+  id              String    @id @default(cuid())
+  profileId       String    @unique
+  profile         Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  stravaAthleteId String
+  accessToken     String
+  refreshToken    String
+  expiresAt       DateTime // access-token expiry (Strava tokens last ~6h)
+  scope           String
+  lastSyncedAt    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 }
 
 model DailyVoiceNote {

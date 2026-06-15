@@ -15,6 +15,10 @@ export type WeightDataPoint = { date: string; weightKg: number };
 
 const TARGET_KG = 68;
 
+function fmtDate(ts: number) {
+  return new Date(ts).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+}
+
 export function WeightProgressChart({ data }: { data: WeightDataPoint[] }) {
   if (data.length === 0) {
     return (
@@ -26,11 +30,7 @@ export function WeightProgressChart({ data }: { data: WeightDataPoint[] }) {
 
   const formatted = data.map((d) => {
     const [y, m, day] = d.date.split("-").map(Number);
-    const label = new Date(y, m - 1, day).toLocaleDateString("en-GB", {
-      month: "short",
-      day: "numeric",
-    });
-    return { weightKg: d.weightKg, label };
+    return { weightKg: d.weightKg, ts: Date.UTC(y, m - 1, day) };
   });
 
   return (
@@ -38,7 +38,11 @@ export function WeightProgressChart({ data }: { data: WeightDataPoint[] }) {
       <LineChart data={formatted} margin={{ top: 10, right: 12, left: -24, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
         <XAxis
-          dataKey="label"
+          dataKey="ts"
+          type="number"
+          scale="time"
+          domain={["dataMin", "dataMax"]}
+          tickFormatter={fmtDate}
           tick={{ fontSize: 11, fill: "rgba(255,255,255,0.45)" }}
           tickLine={false}
           axisLine={false}
@@ -58,6 +62,7 @@ export function WeightProgressChart({ data }: { data: WeightDataPoint[] }) {
           }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(v: any) => [`${Number(v).toFixed(1)} kg`, "Weight"]}
+          labelFormatter={(ts) => fmtDate(Number(ts))}
           labelStyle={{ color: "rgba(255,255,255,0.45)", marginBottom: 2 }}
           cursor={{ stroke: "rgba(255,255,255,0.1)" }}
         />

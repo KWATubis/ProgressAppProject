@@ -19,9 +19,7 @@ export type MacroDay = {
   carbsG: number;
 };
 
-const KCAL_TARGET = 2400;
-
-export function MacroChart({ data }: { data: MacroDay[] }) {
+export function MacroChart({ data, kcalTarget = 2400 }: { data: MacroDay[]; kcalTarget?: number }) {
   if (data.length === 0) {
     return (
       <div className="flex h-44 items-center justify-center text-sm text-muted-foreground">
@@ -67,11 +65,11 @@ export function MacroChart({ data }: { data: MacroDay[] }) {
           cursor={{ fill: "rgba(255,255,255,0.04)" }}
         />
         <ReferenceLine
-          y={KCAL_TARGET}
+          y={kcalTarget}
           stroke="rgba(255,255,255,0.2)"
           strokeDasharray="5 3"
           label={{
-            value: "2 400 kcal",
+            value: `${kcalTarget.toLocaleString()} kcal`,
             position: "insideTopRight",
             fontSize: 10,
             fill: "rgba(255,255,255,0.35)",

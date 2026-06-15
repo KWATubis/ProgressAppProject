@@ -106,7 +106,10 @@ export default async function ProgressPage({
         createdAt: true,
       },
     }),
-    prisma.profile.findUnique({ where: { id: user.id }, select: { createdAt: true } }),
+    prisma.profile.findUnique({
+      where: { id: user.id },
+      select: { createdAt: true, dietKcalTarget: true },
+    }),
     prisma.activityType.findMany({
       where: { profileId: user.id },
       orderBy: { createdAt: "asc" },
@@ -310,7 +313,7 @@ export default async function ProgressPage({
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Daily Calories</p>
-            <MacroChart data={macroData} />
+            <MacroChart data={macroData} kcalTarget={profile?.dietKcalTarget ?? undefined} />
           </div>
         </div>
 

@@ -12,6 +12,10 @@ import { ChartFrame } from "./ChartFrame";
 
 export type ProgressPoint = { date: string; score: number };
 
+function fmtDate(ts: number) {
+  return new Date(ts).toLocaleDateString("en-GB", { month: "short", day: "numeric" });
+}
+
 export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
   if (data.length === 0) {
     return (
@@ -23,11 +27,7 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
 
   const formatted = data.map((d) => {
     const [y, m, day] = d.date.split("-").map(Number);
-    const label = new Date(y, m - 1, day).toLocaleDateString("en-GB", {
-      month: "short",
-      day: "numeric",
-    });
-    return { score: d.score, label };
+    return { score: d.score, ts: Date.UTC(y, m - 1, day) };
   });
 
   // Y-axis maxes out at 1.5× the most recent score so day-to-day movement is
@@ -52,7 +52,11 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
         <XAxis
-          dataKey="label"
+          dataKey="ts"
+          type="number"
+          scale="time"
+          domain={["dataMin", "dataMax"]}
+          tickFormatter={fmtDate}
           tick={{ fontSize: 11, fill: "rgba(255,255,255,0.4)" }}
           tickLine={false}
           axisLine={false}
@@ -74,6 +78,7 @@ export function TotalProgressChart({ data }: { data: ProgressPoint[] }) {
           }}
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(v: any) => [Number(v).toFixed(2), "Score"]}
+          labelFormatter={(ts) => fmtDate(Number(ts))}
           labelStyle={{ color: "rgba(255,255,255,0.4)", marginBottom: 2 }}
           cursor={{ stroke: "rgba(255,255,255,0.08)" }}
         />
