@@ -19,6 +19,7 @@ import { unzipSync } from "fflate";
 import { config } from "dotenv";
 import { parseFit } from "../lib/garmin/parse-fit";
 import { mapSportToActivity } from "../lib/garmin/sport-map";
+import { ingestActivity } from "../lib/activities/ingest";
 
 config({ path: ".env.local" });
 
@@ -122,19 +123,6 @@ async function downloadFit(gc: any, activityId: number): Promise<Uint8Array | nu
 }
 
 const activityCache = new Map<string, string>();
-async function ensureActivity(sport: string): Promise<string> {
-  const m = mapSportToActivity(sport);
-  const cached = activityCache.get(m.slug);
-  if (cached) return cached;
-  const activity = await prisma.activityType.upsert({
-    where: { profileId_slug: { profileId: profileId!, slug: m.slug } },
-    create: { profileId: profileId!, name: m.name, slug: m.slug, icon: m.icon, kind: "CARDIO" },
-    update: {},
-    select: { id: true },
-  });
-  activityCache.set(m.slug, activity.id);
-  return activity.id;
-}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function syncActivities(gc: any) {
@@ -164,52 +152,15 @@ async function syncActivities(gc: any) {
         console.log(`  ✗ ${label}  not a valid FIT activity`);
         continue;
       }
-      // Authoritative dedupe on the FIT's own start timestamp.
-      if (knownIds.has(parsed.externalId)) {
+      // Authoritative dedupe on the FIT's own start timestamp + shared ingest.
+      const status = await ingestActivity(prisma, profileId!, parsed, "garmin", activityCache);
+      if (status === "skipped") {
         skipped++;
         continue;
       }
-      const activityTypeId = await ensureActivity(parsed.sport);
-      const sportName = mapSportToActivity(parsed.sport).name;
-      await prisma.workoutSession.create({
-        data: {
-          profileId: profileId!,
-          activityTypeId,
-          date: parsed.startTime,
-          type: sportName,
-          durationMin: parsed.durationMin,
-          source: "garmin",
-          externalId: parsed.externalId,
-          runs: {
-            create: {
-              type: sportName,
-              trainingType: parsed.trainingType,
-              distanceKm: parsed.distanceKm,
-              durationMin: parsed.durationMin,
-              avgPaceSecPerKm: parsed.avgPaceSecPerKm,
-              avgHRBpm: parsed.avgHRBpm,
-              maxHRBpm: parsed.maxHRBpm,
-              calories: parsed.calories,
-              elevationGainM: parsed.elevationGainM,
-              avgCadence: parsed.avgCadence,
-              laps: {
-                create: parsed.laps.map((l) => ({
-                  lapIndex: l.lapIndex,
-                  distanceM: l.distanceM,
-                  durationSec: l.durationSec,
-                  avgPaceSecPerKm: l.avgPaceSecPerKm,
-                  avgHRBpm: l.avgHRBpm,
-                  maxHRBpm: l.maxHRBpm,
-                  avgCadence: l.avgCadence,
-                  isWork: l.isWork,
-                })),
-              },
-            },
-          },
-        },
-      });
       knownIds.add(parsed.externalId);
       imported++;
+      const sportName = mapSportToActivity(parsed.sport).name;
       const dist = parsed.distanceKm != null ? `${parsed.distanceKm.toFixed(2)}km` : "—";
       console.log(`  ✓ ${label}  ${sportName}  ${dist}  ${parsed.durationMin ?? "—"}min  (${parsed.laps.length} laps)`);
     } catch (err) {
