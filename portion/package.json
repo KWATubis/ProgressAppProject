@@ -8,6 +8,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "garmin": "set NODE_TLS_REJECT_UNAUTHORIZED=0&& tsx scripts/garmin-sync.ts",
+    "keepalive": "set NODE_TLS_REJECT_UNAUTHORIZED=0&& node scripts/supabase-keepalive.mjs",
     "lint": "eslint",
     "postinstall": "prisma generate"
   },
