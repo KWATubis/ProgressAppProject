@@ -18,6 +18,11 @@ export type MuscleState = {
   group: MuscleGroup;
   daysSince: number | null;
   hoursSince: number | null;
+  /** hoursSince scaled by how directly the last session trained this group —
+   * a muscle only hit as a secondary/tertiary mover looks "less tired" than
+   * one that was the primary target, even at the same elapsed time. Drives
+   * color/label; hoursSince stays literal for the "last trained" display. */
+  effectiveHoursSince: number | null;
   lastTrainedISO: string | null;
   lastSets: Array<{
     exercise: string;
@@ -25,6 +30,12 @@ export type MuscleState = {
     weightKg: number | null;
   }>;
 };
+
+/** Weight applied per tier when an exercise trains up to three muscle groups
+ * (primary, secondary, tertiary) — secondary/tertiary movers get scaled-down
+ * fatigue since the muscle wasn't the main target. Extra picks beyond the
+ * third fall back to the tertiary weight. */
+export const MUSCLE_TIER_WEIGHTS = [1, 0.55, 0.3] as const;
 
 const CATEGORY_MAP: Record<string, MuscleGroup[]> = {
   chest: ["chest"],
@@ -78,6 +89,29 @@ export function mapCategory(category: string): MuscleGroup[] {
     if (hit) hit.forEach((g) => groups.add(g));
   }
   return Array.from(groups);
+}
+
+/** Same mapping as mapCategory, but tier-aware: a category string like
+ * "Chest, Triceps, Front delts" is read as primary/secondary/tertiary
+ * (comma order = tier), and each resolved muscle group carries the
+ * corresponding weight from MUSCLE_TIER_WEIGHTS. A group hit by more than
+ * one pick (e.g. it's the primary of one exercise logged the same day it's
+ * a secondary of another) keeps the higher weight. */
+export function mapCategoryWeighted(category: string): Array<{ group: MuscleGroup; weight: number }> {
+  const picks = category
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  const weightByGroup = new Map<MuscleGroup, number>();
+  picks.forEach((pick, i) => {
+    const weight = MUSCLE_TIER_WEIGHTS[i] ?? MUSCLE_TIER_WEIGHTS[MUSCLE_TIER_WEIGHTS.length - 1];
+    for (const group of mapCategory(pick)) {
+      weightByGroup.set(group, Math.max(weightByGroup.get(group) ?? 0, weight));
+    }
+  });
+
+  return Array.from(weightByGroup, ([group, weight]) => ({ group, weight }));
 }
 
 /**

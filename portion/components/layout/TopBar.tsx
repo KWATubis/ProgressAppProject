@@ -11,22 +11,27 @@ export function TopBar({ email, name }: TopBarProps) {
   const displayName = name || email || "";
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-border/60 bg-background/80 px-4 backdrop-blur-sm sm:px-6">
-      <div className="flex items-center gap-2 md:hidden">
-        <MobileNav />
-        <span className="font-display text-base uppercase tracking-wide text-foreground">Portion</span>
-      </div>
-      <div className="ml-auto flex items-center gap-3">
-        {displayName && (
-          <span className="hidden text-sm text-muted-foreground sm:inline">{displayName}</span>
-        )}
-        <Link
-          href="/settings"
-          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground hover:rotate-45"
-          aria-label="Settings"
-        >
-          <Settings className="h-4 w-4" />
-        </Link>
+    <header
+      className="border-b border-border/60 bg-background/80 backdrop-blur-sm"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+    >
+      <div className="flex h-14 items-center justify-between px-4 sm:px-6">
+        <div className="flex items-center gap-2 md:hidden">
+          <MobileNav />
+          <span className="font-display text-base uppercase tracking-wide text-foreground">Portion</span>
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          {displayName && (
+            <span className="hidden text-sm text-muted-foreground sm:inline">{displayName}</span>
+          )}
+          <Link
+            href="/settings"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground hover:rotate-45"
+            aria-label="Settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
     </header>
   );

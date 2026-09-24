@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight } from "@/lib/utils/dates";
-import { MUSCLE_GROUPS, mapCategory, type MuscleState } from "./muscle-state";
+import { MUSCLE_GROUPS, mapCategoryWeighted, type MuscleState } from "./muscle-state";
 
 function daysBetween(from: Date, to: Date): number {
   return Math.max(0, Math.round((to.getTime() - from.getTime()) / 86_400_000));
@@ -26,19 +26,24 @@ export async function getMuscleStates(profileId: string): Promise<MuscleState[]>
 
   const perGroup = new Map<
     string,
-    { date: Date; sets: Array<{ exercise: string; reps: number | null; weightKg: number | null }> }
+    {
+      date: Date;
+      weight: number;
+      sets: Array<{ exercise: string; reps: number | null; weightKg: number | null }>;
+    }
   >();
 
   for (const session of sessions) {
     for (const set of session.exercises) {
-      const groups = mapCategory(set.exercise.category);
-      for (const g of groups) {
+      const weighted = mapCategoryWeighted(set.exercise.category);
+      for (const { group: g, weight } of weighted) {
         const existing = perGroup.get(g);
         if (!existing || session.date > existing.date) {
           perGroup.set(g, {
             date: session.date,
+            weight,
             sets: session.exercises
-              .filter((s) => mapCategory(s.exercise.category).includes(g))
+              .filter((s) => mapCategoryWeighted(s.exercise.category).some((w) => w.group === g))
               .slice(0, 8)
               .map((s) => ({
                 exercise: s.exercise.name,
@@ -46,6 +51,8 @@ export async function getMuscleStates(profileId: string): Promise<MuscleState[]>
                 weightKg: s.weightKg,
               })),
           });
+        } else if (session.date.getTime() === existing.date.getTime()) {
+          existing.weight = Math.max(existing.weight, weight);
         }
       }
     }
@@ -58,14 +65,17 @@ export async function getMuscleStates(profileId: string): Promise<MuscleState[]>
         group,
         daysSince: null,
         hoursSince: null,
+        effectiveHoursSince: null,
         lastTrainedISO: null,
         lastSets: [],
       };
     }
+    const hoursSince = hoursBetween(entry.date, now);
     return {
       group,
       daysSince: daysBetween(entry.date, today),
-      hoursSince: hoursBetween(entry.date, now),
+      hoursSince,
+      effectiveHoursSince: hoursSince / entry.weight,
       lastTrainedISO: entry.date.toISOString().slice(0, 10),
       lastSets: entry.sets,
     };

@@ -77,7 +77,7 @@ export function MobileNav() {
             animate={{ y: 0 }}
             exit={{ y: "-100%" }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            style={{ backgroundColor: "#000" }}
+            style={{ backgroundColor: "#000", paddingTop: "env(safe-area-inset-top, 0px)" }}
             className="fixed inset-0 z-50 flex flex-col md:hidden"
           >
             <div className="flex h-14 shrink-0 items-center justify-between px-5">

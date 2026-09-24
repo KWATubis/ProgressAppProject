@@ -119,10 +119,10 @@ function MuscleDetail({
   states: Record<MuscleGroup, MuscleState>;
 }) {
   const state = states[group];
-  const hours = state?.hoursSince ?? null;
+  const effectiveHours = state?.effectiveHoursSince ?? null;
   const days = state?.daysSince ?? null;
-  const color = tirednessColor(hours);
-  const label = tirednessLabel(hours);
+  const color = tirednessColor(effectiveHours);
+  const label = tirednessLabel(effectiveHours);
 
   return (
     <>

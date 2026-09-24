@@ -976,7 +976,7 @@ export function HoloBody({
   useEffect(() => {
     const cyan = [0.357, 0.89, 1.0];
     const colors = MUSCLE_GROUPS.map((g) => {
-      const c = new THREE.Color(tirednessColor(muscleStates[g]?.hoursSince ?? null));
+      const c = new THREE.Color(tirednessColor(muscleStates[g]?.effectiveHoursSince ?? null));
       return [c.r, c.g, c.b] as [number, number, number];
     });
     for (const m of coloredMeshes) {
