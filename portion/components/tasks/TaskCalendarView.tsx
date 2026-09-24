@@ -345,9 +345,14 @@ export function TaskCalendarView({
         </div>
       </div>
 
+      {/* Day headers, timeline, and unscheduled tray all live in one
+          horizontally-scrolling region so the 7 day columns get a real
+          minimum width on phones instead of being squeezed to fit. The
+          time gutter (first column) stays pinned while days scroll. */}
+      <div className="overflow-x-auto">
       {/* Day headers */}
-      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-1">
-        <div />
+      <div className="grid grid-cols-[40px_repeat(7,minmax(120px,1fr))] gap-1">
+        <div className="sticky left-0 z-10 bg-background" />
         {optimisticDays.map((day) => {
           const totalMin = day.tasks.reduce(
             (sum, t) => sum + (t.durationMin ?? 0),
@@ -385,9 +390,9 @@ export function TaskCalendarView({
       </div>
 
       {/* Timeline: time axis + 7 day columns */}
-      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-1">
+      <div className="mt-1 grid grid-cols-[40px_repeat(7,minmax(120px,1fr))] gap-1">
         {/* Hour labels */}
-        <div className="relative" style={{ height: TIMELINE_HEIGHT_PX }}>
+        <div className="sticky left-0 z-10 bg-background" style={{ height: TIMELINE_HEIGHT_PX }}>
           {Array.from({ length: END_HOUR - START_HOUR + 1 }, (_, i) => (
             <div
               key={i}
@@ -512,8 +517,8 @@ export function TaskCalendarView({
       </div>
 
       {/* Unscheduled tray */}
-      <div className="grid grid-cols-[40px_repeat(7,minmax(0,1fr))] gap-1">
-        <div className="text-right text-[9px] uppercase tracking-wider text-muted-foreground/70">
+      <div className="mt-1 grid grid-cols-[40px_repeat(7,minmax(120px,1fr))] gap-1">
+        <div className="sticky left-0 z-10 bg-background pr-1 text-right text-[9px] uppercase tracking-wider text-muted-foreground/70">
           unscheduled
         </div>
         {optimisticDays.map((day) => {
@@ -558,6 +563,7 @@ export function TaskCalendarView({
             </div>
           );
         })}
+      </div>
       </div>
 
       {/* Floating trash zone — fixed at bottom-centre while a drag is active */}
