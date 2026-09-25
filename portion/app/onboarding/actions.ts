@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import type { WizardPlan } from "./types";
+import { SKILL_UNIT, getSkill, type SkillKey } from "@/lib/calisthenics-skills";
 
 const goalSchema = z.object({
   title: z.string().min(1),
@@ -13,6 +14,7 @@ const goalSchema = z.object({
   targetValue: z.number().nullable(),
   unit: z.string(),
   targetDate: z.string().nullable(),
+  linkSkill: z.enum(["frontLever", "planche"]).optional(),
 });
 
 const habitSchema = z.object({
@@ -73,8 +75,68 @@ export async function savePlan(planJson: string): Promise<SaveResult> {
           create: { id: profileId, email },
         });
 
+        // Goals with linkSkill get wired to a CustomMetric on a shared
+        // "Calisthenics" activity (both created lazily, once) instead of
+        // being plain manual goals — logging a hold (progression + seconds) moves
+        // the goal automatically via withDerivedCurrent.
+        const skillMetricIds = new Map<SkillKey, string>();
+        const neededSkills = goalEntries
+          .map((g) => g.linkSkill)
+          .filter((s): s is SkillKey => !!s);
+
+        if (neededSkills.length > 0) {
+          let calisthenics = await tx.activityType.findUnique({
+            where: { profileId_slug: { profileId, slug: "calisthenics" } },
+          });
+          if (!calisthenics) {
+            calisthenics = await tx.activityType.create({
+              data: {
+                profileId,
+                name: "Calisthenics",
+                slug: "calisthenics",
+                pillar: "HEALTH",
+                kind: "STRENGTH",
+              },
+            });
+          }
+
+          for (const skillKey of new Set(neededSkills)) {
+            const skill = getSkill(skillKey);
+            let metric = await tx.customMetric.findFirst({
+              where: { profileId, activityTypeId: calisthenics.id, title: skill.title },
+            });
+            if (!metric) {
+              metric = await tx.customMetric.create({
+                data: {
+                  profileId,
+                  activityTypeId: calisthenics.id,
+                  title: skill.title,
+                  unit: SKILL_UNIT,
+                  aggregation: "MAX",
+                  direction: "HIGHER_BETTER",
+                },
+              });
+            }
+            skillMetricIds.set(skillKey, metric.id);
+          }
+        }
+
         const createdGoals = await Promise.all(
           goalEntries.map((g) => {
+            if (g.linkSkill) {
+              return tx.goal.create({
+                data: {
+                  profileId,
+                  pillar: g.pillar,
+                  title: g.title,
+                  customMetricId: skillMetricIds.get(g.linkSkill),
+                  targetValue: 100,
+                  startValue: 0,
+                  unit: SKILL_UNIT,
+                  targetDate: g.targetDate ? new Date(g.targetDate) : undefined,
+                },
+              });
+            }
             // Default startValue: for "shrink" goals the user starts at currentValue,
             // for "grow" goals start = 0 so progress matches current/target mental model.
             const start =

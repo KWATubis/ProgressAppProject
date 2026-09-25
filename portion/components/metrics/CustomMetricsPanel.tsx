@@ -21,6 +21,7 @@ import {
   type CustomMetricLite,
 } from "@/components/metrics/CreateCustomMetricDialog";
 import type { CustomMetricView } from "@/lib/goalMetrics.server";
+import { FULL_HOLD_SECONDS, findSkillByTitle } from "@/lib/calisthenics-skills";
 
 const AGG_LABEL: Record<CustomMetricView["aggregation"], string> = {
   LATEST: "Latest",
@@ -104,6 +105,16 @@ function MetricCard({
     direction: metric.direction,
   };
 
+  // Calisthenics skills: the value is a % of the full skill, and each entry's
+  // note says what was actually held ("Advanced Tuck Front Lever — 5s").
+  const skill = findSkillByTitle(metric.title);
+  const bestHold = skill
+    ? metric.entries.reduce<CustomMetricView["entries"][number] | null>(
+        (best, e) => (!best || e.value > best.value ? e : best),
+        null,
+      )?.notes ?? null
+    : null;
+
   return (
     <div
       className="rounded-xl border bg-card p-4"
@@ -113,7 +124,9 @@ function MetricCard({
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{metric.title}</p>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            {AGG_LABEL[metric.aggregation]} · {metric.unit}
+            {skill
+              ? `Best hold · % of ${FULL_HOLD_SECONDS}s full`
+              : `${AGG_LABEL[metric.aggregation]} · ${metric.unit}`}
           </p>
         </div>
         <div className="flex items-center gap-0.5">
@@ -143,6 +156,7 @@ function MetricCard({
             {metric.current != null ? metric.current.toLocaleString() : "—"}
           </span>
           <span className="ml-1 text-xs text-muted-foreground">{metric.unit}</span>
+          {bestHold && <p className="text-[11px] text-muted-foreground">{bestHold}</p>}
         </div>
         {metric.entries.length > 0 && (
           <button
@@ -171,7 +185,7 @@ function MetricCard({
       {showHistory && metric.entries.length > 0 && (
         <div className="mt-2 space-y-1 border-t border-white/5 pt-2">
           {[...metric.entries].reverse().map((e) => (
-            <EntryRow key={e.id} entry={e} unit={metric.unit} />
+            <EntryRow key={e.id} entry={e} unit={metric.unit} showNote={!!skill} />
           ))}
         </div>
       )}
@@ -185,9 +199,11 @@ function MetricCard({
 function EntryRow({
   entry,
   unit,
+  showNote,
 }: {
-  entry: { id: string; date: string; value: number };
+  entry: { id: string; date: string; value: number; notes: string | null };
   unit: string;
+  showNote: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -211,9 +227,12 @@ function EntryRow({
   });
 
   return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-muted-foreground">{dateStr}</span>
-      <div className="flex items-center gap-2">
+    <div className="flex items-center justify-between gap-2 text-xs">
+      <span className="min-w-0 truncate text-muted-foreground">
+        {dateStr}
+        {showNote && entry.notes ? ` · ${entry.notes}` : ""}
+      </span>
+      <div className="flex shrink-0 items-center gap-2">
         <span className="tabular-nums">
           {entry.value.toLocaleString()} {unit}
         </span>

@@ -150,6 +150,31 @@ export const triathleteplan: WizardPlan = {
   },
 };
 
+export const calisthenicsPlan: WizardPlan = {
+  health: {
+    goals: [
+      { title: "Front Lever hold (3s)", currentValue: null, targetValue: null, unit: "", targetDate: null, linkSkill: "frontLever" },
+      { title: "Planche hold (3s)", currentValue: null, targetValue: null, unit: "", targetDate: null, linkSkill: "planche" },
+    ],
+    habits: [
+      { title: "Front Lever training", frequency: "WEEKLY", dayOfWeek: [1, 4], checked: true },
+      { title: "Planche training", frequency: "WEEKLY", dayOfWeek: [2, 5], checked: true },
+      { title: "Skill work + conditioning", frequency: "WEEKLY", dayOfWeek: [3, 6], checked: true },
+      { title: "Log body weight", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+    ],
+  },
+  money: {
+    goals: [
+      { title: "TikTok followers", currentValue: 1000, targetValue: 25000, unit: "followers", targetDate: null },
+    ],
+    habits: [
+      { title: "Film training clip", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Post content", frequency: "DAILY", dayOfWeek: [], checked: true },
+      { title: "Update follower count", frequency: "WEEKLY", dayOfWeek: [0], checked: true },
+    ],
+  },
+};
+
 export function buildAthletePlan(kind: "endurance" | "sport", sportName: string): WizardPlan {
   const name = sportName.trim() || "your sport";
   if (kind === "endurance") {
@@ -195,6 +220,7 @@ export type ArchetypeId =
   | "sideHustler"
   | "triathlete"
   | "athlete"
+  | "calisthenics"
   | "allIn";
 
 export type Archetype = {
@@ -247,6 +273,13 @@ export const ARCHETYPES: Archetype[] = [
     tagline: "Train your sport. Chase your standard.",
     blurb: "Sport-first — pick your discipline and build the plan around it.",
     plan: buildAthletePlan("endurance", "your sport"),
+  },
+  {
+    id: "calisthenics",
+    name: "The Calisthenics Athlete",
+    tagline: "Two skills. One feed. Full send.",
+    blurb: "Front lever and planche, trained in parallel — filmed and posted as you climb the progressions.",
+    plan: calisthenicsPlan,
   },
   {
     id: "allIn",

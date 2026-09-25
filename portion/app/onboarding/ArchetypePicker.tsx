@@ -1,6 +1,6 @@
 "use client";
 
-import { Banknote, Check, Clapperboard, Dumbbell, Flame, Timer, Trophy, Zap, type LucideIcon } from "lucide-react";
+import { Banknote, Check, Clapperboard, Dumbbell, Flame, PersonStanding, Timer, Trophy, Zap, type LucideIcon } from "lucide-react";
 import type { Archetype, ArchetypeId } from "./defaults";
 import type { WizardPlan } from "./types";
 
@@ -11,6 +11,7 @@ const ICONS: Record<ArchetypeId, LucideIcon> = {
   sideHustler: Banknote,
   triathlete: Timer,
   athlete: Trophy,
+  calisthenics: PersonStanding,
   allIn: Zap,
 };
 

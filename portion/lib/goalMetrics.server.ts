@@ -227,7 +227,7 @@ export type CustomMetricView = {
   aggregation: "LATEST" | "MAX" | "SUM" | "COUNT" | "AVG";
   direction: "HIGHER_BETTER" | "LOWER_BETTER";
   current: number | null;
-  entries: { id: string; date: string; value: number }[];
+  entries: { id: string; date: string; value: number; notes: string | null }[];
 };
 
 /** Reduce a metric's entries to its single headline value per aggregation
@@ -264,7 +264,7 @@ export async function loadActivityCustomMetrics(
     include: {
       entries: {
         orderBy: { date: "asc" },
-        select: { id: true, date: true, value: true },
+        select: { id: true, date: true, value: true, notes: true },
       },
     },
   });
@@ -274,6 +274,7 @@ export async function loadActivityCustomMetrics(
       id: e.id,
       date: e.date.toISOString().slice(0, 10),
       value: e.value,
+      notes: e.notes,
     }));
     return {
       id: m.id,

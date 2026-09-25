@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { CALISTHENICS_SKILLS, SKILL_UNIT } from "@/lib/calisthenics-skills";
 
 export type CustomMetricLite = {
   id: string;
@@ -112,6 +113,13 @@ function CreateForm({
     };
   }, []);
 
+  function applySkillPreset(skillTitle: string) {
+    setTitle(skillTitle);
+    setUnit(SKILL_UNIT);
+    setAggregation("MAX");
+    setDirection("HIGHER_BETTER");
+  }
+
   function suggest() {
     if (!title.trim()) {
       toast.error("Type a title first so AI knows what to shape.");
@@ -174,6 +182,31 @@ function CreateForm({
   return (
     <>
       <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label>Calisthenics skill presets</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {CALISTHENICS_SKILLS.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                onClick={() => applySkillPreset(s.title)}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-[11px] font-medium transition",
+                  title.trim().toLowerCase() === s.title.toLowerCase()
+                    ? "border-foreground bg-foreground text-background"
+                    : "border-input text-muted-foreground hover:bg-accent",
+                )}
+              >
+                {s.title}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Tracks your best hold as a % of the full skill — logging asks for
+            the progression, band or not, and seconds held.
+          </p>
+        </div>
+
         <div className="space-y-1.5">
           <Label htmlFor="cm-title">What are you tracking?</Label>
           <Input
