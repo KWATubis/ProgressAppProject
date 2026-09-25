@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 
 // Delete an activity and all of its sessions.
@@ -7,8 +7,7 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { slug } = await params;

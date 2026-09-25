@@ -1,15 +1,12 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { formatISODate } from "@/lib/utils/dates";
 import { WeightProgressChart, type WeightDataPoint } from "@/components/charts/WeightProgressChart";
 import { Stagger } from "@/components/motion/Stagger";
 
 export default async function HealthMetricsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const metrics = await prisma.bodyMetric.findMany({

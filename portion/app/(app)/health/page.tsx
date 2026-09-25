@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate, addDays } from "@/lib/utils/dates";
 import { WeightProgressChart, type WeightDataPoint } from "@/components/charts/WeightProgressChart";
@@ -16,10 +16,7 @@ import { loadStrengthPRs } from "@/lib/strength.server";
 import { Stagger } from "@/components/motion/Stagger";
 
 export default async function HealthOverviewPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const today = toUtcMidnight();

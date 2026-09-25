@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 
 // Legacy /money/income route — redirects to the user's first income-style
 // activity (SIDE_INCOME, MAIN_INCOME, or BUSINESS) or to Money overview.
 export default async function MoneyIncomeRedirect() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const income = await prisma.activityType.findFirst({

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import {
   GoalsManager,
@@ -11,17 +11,22 @@ import { PageHeading } from "@/components/layout/PageHeading";
 import { Reveal } from "@/components/motion/Reveal";
 
 export default async function GoalsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
-  const goals = await prisma.goal.findMany({
-    where: { profileId: user.id },
-    orderBy: [{ pillar: "asc" }, { isActive: "desc" }, { createdAt: "asc" }],
-  });
-  const refreshed = await withDerivedCurrent(goals);
+  const [refreshed, rawCustomMetrics] = await Promise.all([
+    prisma.goal
+      .findMany({
+        where: { profileId: user.id },
+        orderBy: [{ pillar: "asc" }, { isActive: "desc" }, { createdAt: "asc" }],
+      })
+      .then(withDerivedCurrent),
+    prisma.customMetric.findMany({
+      where: { profileId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: { activityType: { select: { name: true, pillar: true } } },
+    }),
+  ]);
 
   const views: GoalView[] = refreshed.map((g) => ({
     id: g.id,
@@ -39,13 +44,7 @@ export default async function GoalsPage() {
     customMetricId: g.customMetricId,
   }));
 
-  const customMetrics: CustomMetricOption[] = (
-    await prisma.customMetric.findMany({
-      where: { profileId: user.id },
-      orderBy: { createdAt: "desc" },
-      include: { activityType: { select: { name: true, pillar: true } } },
-    })
-  ).map((m) => ({
+  const customMetrics: CustomMetricOption[] = rawCustomMetrics.map((m) => ({
     id: m.id,
     title: m.title,
     unit: m.unit,

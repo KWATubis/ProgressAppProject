@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import {
   toUtcMidnight,
@@ -23,10 +23,7 @@ export default async function TasksPage({
 }: {
   searchParams: Promise<{ week?: string }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const params = await searchParams;

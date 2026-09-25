@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate, addDays, parseISODate } from "@/lib/utils/dates";
 import { MacroSummaryBar, DEFAULT_MACRO_TARGETS } from "@/components/health/MacroSummaryBar";
@@ -16,10 +16,7 @@ export default async function HealthDietPage({
 }: {
   searchParams: Promise<{ date?: string }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const params = await searchParams;

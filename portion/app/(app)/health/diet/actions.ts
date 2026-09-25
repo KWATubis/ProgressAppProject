@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 
 const schema = z.object({
@@ -15,10 +15,7 @@ const schema = z.object({
 export type ActionResult = { ok: true } | { error: string };
 
 export async function updateDietTargets(input: unknown): Promise<ActionResult> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return { error: "Not authenticated" };
 
   const parsed = schema.safeParse(input);

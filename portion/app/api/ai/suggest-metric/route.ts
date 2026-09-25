@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { isAiConfigured, suggestMetricFromTitle } from "@/lib/ai/suggestMetric";
 
 const schema = z.object({
@@ -8,8 +8,7 @@ const schema = z.object({
 });
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (!isAiConfigured()) {

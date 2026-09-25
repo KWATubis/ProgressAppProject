@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 
 // Legacy /money/content route — redirects to the user's first SOCIAL activity
 // (e.g. TikTok) or to the Money overview if none exists.
 export default async function MoneyContentRedirect() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const social = await prisma.activityType.findFirst({

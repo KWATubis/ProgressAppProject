@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Dumbbell } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { Button } from "@/components/ui/button";
 import { CardioProgressChart, type CardioDataPoint } from "@/components/charts/CardioProgressChart";
@@ -26,8 +26,7 @@ export default async function ActivityPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const { slug } = await params;
@@ -47,20 +46,23 @@ export default async function ActivityPage({
   });
   if (!activity) notFound();
 
-  const sessions = await prisma.workoutSession.findMany({
-    where: { profileId: user.id, activityTypeId: activity.id },
-    orderBy: { date: "desc" },
-    include: {
-      exercises: { include: { exercise: true } },
-      runs: { include: { laps: { orderBy: { lapIndex: "asc" } } } },
-    },
-  });
-
-  const rawActivityGoals = await prisma.goal.findMany({
-    where: { profileId: user.id, activityTypeId: activity.id, isActive: true },
-    orderBy: { createdAt: "asc" },
-  });
-  const activityGoals = await withDerivedCurrent(rawActivityGoals);
+  const [sessions, activityGoals, customMetricViews] = await Promise.all([
+    prisma.workoutSession.findMany({
+      where: { profileId: user.id, activityTypeId: activity.id },
+      orderBy: { date: "desc" },
+      include: {
+        exercises: { include: { exercise: true } },
+        runs: { include: { laps: { orderBy: { lapIndex: "asc" } } } },
+      },
+    }),
+    prisma.goal
+      .findMany({
+        where: { profileId: user.id, activityTypeId: activity.id, isActive: true },
+        orderBy: { createdAt: "asc" },
+      })
+      .then(withDerivedCurrent),
+    loadActivityCustomMetrics(user.id, activity.id),
+  ]);
   const rawActivityGoal = activityGoals[0] ?? null;
   const activityGoal: ActivityGoalData | null = rawActivityGoal
     ? {
@@ -77,7 +79,6 @@ export default async function ActivityPage({
       }
     : null;
 
-  const customMetricViews = await loadActivityCustomMetrics(user.id, activity.id);
   const customMetrics = customMetricViews.map((m) => ({
     id: m.id,
     title: m.title,

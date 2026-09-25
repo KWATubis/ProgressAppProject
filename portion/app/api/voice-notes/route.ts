@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { createAdminClient, VOICE_NOTES_BUCKET } from "@/lib/supabase/admin";
 import { prisma } from "@/lib/prisma";
 import { parseISODate, formatISODate } from "@/lib/utils/dates";
@@ -18,8 +18,7 @@ function storagePath(userId: string, dateISO: string) {
 }
 
 export async function POST(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   let form: FormData;
@@ -73,8 +72,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dateRaw = new URL(req.url).searchParams.get("date");
@@ -102,8 +100,7 @@ export async function GET(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const dateRaw = new URL(req.url).searchParams.get("date");

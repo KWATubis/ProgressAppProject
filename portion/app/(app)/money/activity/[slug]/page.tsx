@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { formatISODate } from "@/lib/utils/dates";
 import { SocialGrowthChart, type FollowerDataPoint } from "@/components/charts/SocialGrowthChart";
@@ -22,8 +22,7 @@ export default async function MoneyActivityPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const { slug } = await params;
@@ -33,11 +32,15 @@ export default async function MoneyActivityPage({
   });
   if (!activity || activity.pillar !== "MONEY") notFound();
 
-  const rawActivityGoals = await prisma.goal.findMany({
-    where: { profileId: user.id, activityTypeId: activity.id, isActive: true },
-    orderBy: { createdAt: "asc" },
-  });
-  const activityGoals = await withDerivedCurrent(rawActivityGoals);
+  const [activityGoals, customMetricViews] = await Promise.all([
+    prisma.goal
+      .findMany({
+        where: { profileId: user.id, activityTypeId: activity.id, isActive: true },
+        orderBy: { createdAt: "asc" },
+      })
+      .then(withDerivedCurrent),
+    loadActivityCustomMetrics(user.id, activity.id),
+  ]);
   const rawActivityGoal = activityGoals[0] ?? null;
   const activityGoal: ActivityGoalData | null = rawActivityGoal
     ? {
@@ -54,7 +57,6 @@ export default async function MoneyActivityPage({
       }
     : null;
 
-  const customMetricViews = await loadActivityCustomMetrics(user.id, activity.id);
   const customMetrics = customMetricViews.map((m) => ({
     id: m.id,
     title: m.title,

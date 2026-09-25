@@ -25,9 +25,11 @@ export async function proxy(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims verifies the JWT locally against the cached signing keys (and
+  // refreshes the session if it's about to expire) — no Auth round trip per
+  // request like getUser().
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims;
 
   const isAppRoute =
     request.nextUrl.pathname.startsWith("/dashboard") ||
@@ -35,7 +37,9 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith("/check-in") ||
     request.nextUrl.pathname.startsWith("/health") ||
     request.nextUrl.pathname.startsWith("/money") ||
-    request.nextUrl.pathname.startsWith("/progress");
+    request.nextUrl.pathname.startsWith("/progress") ||
+    request.nextUrl.pathname.startsWith("/goals") ||
+    request.nextUrl.pathname.startsWith("/settings");
 
   if (!user && isAppRoute) {
     const url = request.nextUrl.clone();
@@ -48,6 +52,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|glb|js|webmanifest)$).*)",
   ],
 };

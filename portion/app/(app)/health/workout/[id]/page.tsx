@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { ExerciseSetRow, type ExerciseWithSets } from "@/components/health/ExerciseSetRow";
 import { DeleteSessionButton } from "@/components/health/DeleteSessionButton";
@@ -13,10 +13,7 @@ export default async function WorkoutDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const { id } = await params;

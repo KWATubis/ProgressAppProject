@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Coins, Sparkles } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight } from "@/lib/utils/dates";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,10 +22,7 @@ type ActivitySummary = {
 };
 
 export default async function MoneyOverviewPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const today = toUtcMidnight();

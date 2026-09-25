@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { toUtcMidnight, formatISODate } from "@/lib/utils/dates";
 import { isTaskScheduledOn } from "@/lib/utils/tasks";
@@ -18,10 +18,7 @@ import { detectBrokenStreaks } from "@/lib/tasks/streaks";
 import { getWeekDates } from "@/lib/utils/dates";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const today = toUtcMidnight();

@@ -299,17 +299,17 @@ export async function withDerivedCurrent<
     customMetricId?: string | null;
   },
 >(goals: T[]): Promise<T[]> {
-  const out: T[] = [];
-  for (const g of goals) {
-    if (g.customMetricId) {
-      const v = await computeCustomMetricValue(g.customMetricId);
-      out.push({ ...g, currentValue: v });
-    } else if (g.metricKey) {
-      const v = await computeMetricValue(g.profileId, g.metricKey, g.activityTypeId ?? null);
-      out.push({ ...g, currentValue: v });
-    } else {
-      out.push(g);
-    }
-  }
-  return out;
+  // Resolve every goal concurrently — each is 1–2 independent queries.
+  return Promise.all(
+    goals.map(async (g) => {
+      if (g.customMetricId) {
+        return { ...g, currentValue: await computeCustomMetricValue(g.customMetricId) };
+      }
+      if (g.metricKey) {
+        const v = await computeMetricValue(g.profileId, g.metricKey, g.activityTypeId ?? null);
+        return { ...g, currentValue: v };
+      }
+      return g;
+    }),
+  );
 }

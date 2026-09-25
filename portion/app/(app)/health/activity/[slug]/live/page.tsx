@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { LiveSession, type LiveDay } from "@/components/health/live/LiveSession";
 import { loadLastPerformance } from "@/lib/health/last-performance.server";
@@ -10,8 +10,7 @@ export default async function LiveSessionPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) redirect("/auth/login");
 
   const { slug } = await params;

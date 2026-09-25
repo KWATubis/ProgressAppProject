@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { OnboardingWizard } from "./OnboardingWizard";
 import { defaultPlan, ARCHETYPES } from "./defaults";
@@ -12,10 +12,7 @@ export default async function OnboardingPage({
   const params = await searchParams;
   const PREVIEW = params.preview === "1";
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user && !PREVIEW) {
     redirect("/auth/signup");

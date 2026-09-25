@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { isValidColor } from "@/lib/activity-colors";
 
@@ -8,8 +8,7 @@ const MONEY_KINDS = ["SOCIAL", "SIDE_INCOME", "MAIN_INCOME", "BUSINESS"] as cons
 type ActivityKind = (typeof HEALTH_KINDS)[number] | (typeof MONEY_KINDS)[number];
 
 export async function GET(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const url = new URL(request.url);
@@ -27,8 +26,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();

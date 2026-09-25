@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser } from "@/lib/supabase/server";
 import { prisma } from "@/lib/prisma";
 import { findMetric } from "@/lib/goalMetrics";
 import { computeCustomMetricValue, computeMetricValue } from "@/lib/goalMetrics.server";
@@ -27,10 +27,7 @@ export type UpsertGoalInput = z.infer<typeof upsertSchema>;
 export type ActionResult = { ok: true } | { error: string };
 
 async function requireUser() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
   if (!user) throw new Error("Not authenticated");
   return user;
 }
